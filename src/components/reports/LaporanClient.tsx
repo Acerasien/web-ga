@@ -69,6 +69,11 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
 
   // CSV utilities states
   const [exporting, setExporting] = useState<boolean>(false);
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Generate Year dropdown range (current year +/- 2 years)
   const activeYear = new Date().getFullYear();
@@ -484,7 +489,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
                 <div className={styles.chartFrameEmpty}>
                   Tidak ada data tren untuk divisualisasikan.
                 </div>
-              ) : (
+              ) : mounted ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={report.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
@@ -509,7 +514,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
                     />
                   </LineChart>
                 </ResponsiveContainer>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -524,7 +529,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
                 <div className={styles.chartFrameEmpty}>
                   Belum ada data proporsi.
                 </div>
-              ) : (
+              ) : mounted ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsPieChart>
                     <Pie
@@ -543,7 +548,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
                     <Tooltip formatter={(value) => formatRupiah(Number(value))} />
                   </RechartsPieChart>
                 </ResponsiveContainer>
-              )}
+              ) : null}
             </div>
 
             {/* Customized Category shares Dot list */}
@@ -579,7 +584,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
                   <div className={styles.chartFrameEmpty}>
                     Belum ada data cabang terekam.
                   </div>
-                ) : (
+                ) : mounted ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <RechartsBarChart data={report.byBranch} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
@@ -601,7 +606,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
                       </Bar>
                     </RechartsBarChart>
                   </ResponsiveContainer>
-                )}
+                ) : null}
               </div>
             </div>
           )}
