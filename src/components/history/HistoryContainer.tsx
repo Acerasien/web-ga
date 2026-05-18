@@ -10,7 +10,10 @@ import {
   Eye, 
   Plus, 
   XCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import Link from 'next/link';
 import { getTransactions } from '@/lib/actions/transactions';
@@ -39,6 +42,10 @@ export default function HistoryContainer({ user, categories, branches }: History
   const [endDate, setEndDate] = useState<string>('');
   const [page, setPage] = useState<number>(1);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  // Sorting States
+  const [sortBy, setSortBy] = useState<string>('transactionDate');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Queries States
   const [transactions, setTransactions] = useState<TransactionWithRelations[]>([]);
@@ -82,6 +89,8 @@ export default function HistoryContainer({ user, categories, branches }: History
           endDate: endDate || undefined,
           page,
           limit: 10, // Locked pagination size from feedback recommendation
+          sortBy,
+          sortOrder,
         });
 
         if (result.success && result.data) {
@@ -100,7 +109,18 @@ export default function HistoryContainer({ user, categories, branches }: History
     };
 
     loadTransactions();
-  }, [debouncedSearch, branchId, categoryId, paymentMethod, startDate, endDate, page, refreshTrigger]);
+  }, [debouncedSearch, branchId, categoryId, paymentMethod, startDate, endDate, page, refreshTrigger, sortBy, sortOrder]);
+
+  // Handle Interactive Header Clicks Sorting
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder(field === 'category' || field === 'branch' ? 'asc' : 'desc');
+    }
+    setPage(1);
+  };
 
   // Reset all filters in one click
   const handleResetFilters = () => {
@@ -111,6 +131,8 @@ export default function HistoryContainer({ user, categories, branches }: History
     setStartDate('');
     setEndDate('');
     setPage(1);
+    setSortBy('transactionDate');
+    setSortOrder('desc');
   };
 
   // Click row handlers
@@ -240,6 +262,35 @@ export default function HistoryContainer({ user, categories, branches }: History
               onChange={(e) => handleFilterChange(setEndDate, e.target.value)}
             />
           </div>
+
+          {/* Sorting Dropdown (Highly Mobile Friendly) */}
+          <div className={styles.filterGroup}>
+            <label htmlFor="sort-filter" className={styles.label}>Urutkan</label>
+            <select
+              id="sort-filter"
+              className={styles.input}
+              value={`${sortBy}-${sortOrder}`}
+              onChange={(e) => {
+                const [field, order] = e.target.value.split('-');
+                setSortBy(field);
+                setSortOrder(order as 'asc' | 'desc');
+                setPage(1);
+              }}
+            >
+              <option value="transactionDate-desc">Tanggal (Terbaru)</option>
+              <option value="transactionDate-asc">Tanggal (Terlama)</option>
+              <option value="totalAmount-desc">Total Biaya (Tertinggi)</option>
+              <option value="totalAmount-asc">Total Biaya (Terendah)</option>
+              <option value="category-asc">Kategori (A - Z)</option>
+              <option value="category-desc">Kategori (Z - A)</option>
+              {user.role === 'SUPERADMIN' && (
+                <>
+                  <option value="branch-asc">Cabang (A - Z)</option>
+                  <option value="branch-desc">Cabang (Z - A)</option>
+                </>
+              )}
+            </select>
+          </div>
         </div>
 
         {/* Bottom Search & Action bar */}
@@ -293,12 +344,50 @@ export default function HistoryContainer({ user, categories, branches }: History
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th className={styles.th}>Tanggal</th>
-                    {user.role === 'SUPERADMIN' && <th className={styles.th}>Cabang</th>}
-                    <th className={styles.th}>Kategori</th>
+                    <th className={styles.th} onClick={() => handleSort('transactionDate')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <span>Tanggal</span>
+                        {sortBy === 'transactionDate' ? (
+                          sortOrder === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                        ) : (
+                          <ArrowUpDown size={14} style={{ opacity: 0.3 }} />
+                        )}
+                      </div>
+                    </th>
+                    {user.role === 'SUPERADMIN' && (
+                      <th className={styles.th} onClick={() => handleSort('branch')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <span>Cabang</span>
+                          {sortBy === 'branch' ? (
+                            sortOrder === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                          ) : (
+                            <ArrowUpDown size={14} style={{ opacity: 0.3 }} />
+                          )}
+                        </div>
+                      </th>
+                    )}
+                    <th className={styles.th} onClick={() => handleSort('category')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <span>Kategori</span>
+                        {sortBy === 'category' ? (
+                          sortOrder === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                        ) : (
+                          <ArrowUpDown size={14} style={{ opacity: 0.3 }} />
+                        )}
+                      </div>
+                    </th>
                     <th className={styles.th}>Deskripsi / Kebutuhan</th>
                     <th className={styles.th} style={{ textAlign: 'right' }}>Jumlah</th>
-                    <th className={styles.th} style={{ textAlign: 'right' }}>Total Biaya</th>
+                    <th className={styles.th} onClick={() => handleSort('totalAmount')} style={{ cursor: 'pointer', userSelect: 'none', textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end', width: '100%' }}>
+                        <span>Total Biaya</span>
+                        {sortBy === 'totalAmount' ? (
+                          sortOrder === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                        ) : (
+                          <ArrowUpDown size={14} style={{ opacity: 0.3 }} />
+                        )}
+                      </div>
+                    </th>
                     <th className={styles.th} style={{ textAlign: 'center' }}>Pembayaran</th>
                     <th className={styles.th} style={{ textAlign: 'center' }}>Bukti</th>
                     <th className={styles.th} style={{ textAlign: 'center' }}>Aksi</th>

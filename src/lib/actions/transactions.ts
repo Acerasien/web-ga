@@ -132,6 +132,8 @@ export interface TransactionFilter {
   endDate?: string;
   page: number;
   limit: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface TransactionWithRelations extends Omit<Transaction, 'quantity' | 'pricePerUnit' | 'totalAmount'> {
@@ -179,6 +181,8 @@ export async function getTransactions(
       endDate,
       page,
       limit,
+      sortBy = 'transactionDate',
+      sortOrder = 'desc',
     } = filters;
 
     // Enforce role boundaries (Poka-Yoke)
@@ -236,6 +240,33 @@ export async function getTransactions(
     const skip = (page - 1) * limit;
     const take = limit;
 
+    // Build Prisma dynamic orderBy structure
+    let orderBy: Prisma.TransactionOrderByWithRelationInput = {
+      transactionDate: 'desc',
+    };
+
+    if (sortBy) {
+      if (sortBy === 'category') {
+        orderBy = {
+          category: {
+            name: sortOrder,
+          },
+        };
+      } else if (sortBy === 'branch') {
+        orderBy = {
+          branch: {
+            name: sortOrder,
+          },
+        };
+      } else if (
+        ['transactionDate', 'totalAmount', 'quantity', 'pricePerUnit', 'description', 'vendor', 'paymentMethod', 'createdAt'].includes(sortBy)
+      ) {
+        orderBy = {
+          [sortBy]: sortOrder,
+        };
+      }
+    }
+
     // Execute queries in parallel to ensure optimal performance
     const [transactions, totalCount] = await Promise.all([
       prisma.transaction.findMany({
@@ -251,9 +282,7 @@ export async function getTransactions(
             },
           },
         },
-        orderBy: {
-          transactionDate: 'desc',
-        },
+        orderBy,
         skip,
         take,
       }),
