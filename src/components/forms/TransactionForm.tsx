@@ -43,6 +43,7 @@ export default function TransactionForm({ user, categories, branches }: Transact
   const [quantity, setQuantity] = useState<number>(1);
   const [unit, setUnit] = useState<string>('Pcs');
   const [pricePerUnit, setPricePerUnit] = useState<number>(0);
+  const [priceDisplay, setPriceDisplay] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('CASH');
   const [vendor, setVendor] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
@@ -216,6 +217,7 @@ export default function TransactionForm({ user, categories, branches }: Transact
     setQuantity(1);
     setUnit('Pcs');
     setPricePerUnit(0);
+    setPriceDisplay('');
     setVendor('');
     setNotes('');
     setCustomFields({});
@@ -467,12 +469,22 @@ export default function TransactionForm({ user, categories, branches }: Transact
               <div style={{ position: 'relative' }}>
                 <input
                   id="pricePerUnit"
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
                   className={styles.input}
                   style={{ paddingLeft: 'var(--space-10)' }}
-                  value={pricePerUnit === 0 ? '' : pricePerUnit}
-                  onChange={(e) => setPricePerUnit(Number(e.target.value))}
+                  placeholder="Contoh: 150.000"
+                  value={priceDisplay}
+                  onChange={(e) => {
+                    const valueStr = e.target.value;
+                    const rawDigits = valueStr.replace(/[^0-9]/g, '');
+                    const numericValue = rawDigits ? Number(rawDigits) : 0;
+                    
+                    setPricePerUnit(numericValue);
+                    
+                    const formatted = rawDigits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                    setPriceDisplay(formatted);
+                  }}
                   disabled={isPending}
                   required
                 />
