@@ -33,9 +33,9 @@ import { formatRupiah } from '@/lib/formatters';
 import { getReportData } from '@/lib/actions/reports';
 import { getTransactions } from '@/lib/actions/transactions';
 import type { ReportPayload, ReportFilter } from '@/lib/actions/reports';
+import Link from 'next/link';
 import type { Branch } from '@prisma/client';
 import type { AuthUser } from '@/types';
-import CSVImportModal from '@/components/modals/CSVImportModal';
 import styles from '@/app/(dashboard)/laporan/reports.module.css';
 
 interface LaporanClientProps {
@@ -69,7 +69,6 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
 
   // CSV utilities states
   const [exporting, setExporting] = useState<boolean>(false);
-  const [importModalOpen, setImportModalOpen] = useState<boolean>(false);
 
   // Generate Year dropdown range (current year +/- 2 years)
   const activeYear = new Date().getFullYear();
@@ -336,14 +335,14 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
           </button>
           
           {user.role !== 'VIEWER' && (
-            <button 
-              type="button" 
-              onClick={() => setImportModalOpen(true)} 
+            <Link 
+              href="/transaksi/import" 
               className={`${styles.actionBtn} ${styles.importBtn}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
             >
               <Upload size={16} />
               <span>Unggah Excel / CSV</span>
-            </button>
+            </Link>
           )}
         </div>
       </header>
@@ -610,14 +609,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         </section>
       ) : null}
 
-      {/* CSV Bulk Importer Modal Anchor */}
-      <CSVImportModal
-        isOpen={importModalOpen}
-        onClose={() => setImportModalOpen(false)}
-        onImportSuccess={() => {
-          loadReportData(); // Refresh dynamic reports grid upon successful import
-        }}
-      />
+
     </div>
   );
 }

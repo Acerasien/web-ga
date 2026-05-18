@@ -2,14 +2,13 @@
 
 import { useState, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
 import { 
   Upload, 
   FileSpreadsheet, 
   CheckCircle, 
   AlertTriangle, 
   AlertCircle, 
-  ArrowRight,
   History,
   LayoutDashboard
 } from 'lucide-react';
@@ -23,7 +22,6 @@ interface CSVImportClientProps {
 }
 
 export default function CSVImportClient({ user }: CSVImportClientProps) {
-  const router = useRouter();
   const [dragActive, setDragActive] = useState<boolean>(false);
   const [file, setFile] = useState<File | null>(null);
   const [csvText, setCsvText] = useState<string>('');
@@ -47,8 +45,11 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
   };
 
   const processFile = (selectedFile: File) => {
-    if (!selectedFile.name.endsWith('.csv')) {
-      setGeneralError('Format file salah. Hanya file .csv yang diperbolehkan.');
+    const isExcel = selectedFile.name.endsWith('.xlsx') || selectedFile.name.endsWith('.xls');
+    const isCsv = selectedFile.name.endsWith('.csv');
+
+    if (!isExcel && !isCsv) {
+      setGeneralError('Format file salah. Hanya file .csv, .xlsx, atau .xls yang diperbolehkan.');
       setFile(null);
       setCsvText('');
       return;
@@ -59,12 +60,32 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
     setResult(null);
 
     const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        setCsvText(e.target.result as string);
-      }
-    };
-    reader.readAsText(selectedFile);
+
+    if (isExcel) {
+      reader.onload = (e) => {
+        try {
+          if (e.target?.result) {
+            const data = new Uint8Array(e.target.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const csvContent = XLSX.utils.sheet_to_csv(worksheet);
+            setCsvText(csvContent);
+          }
+        } catch (err) {
+          console.error('Error parsing Excel file:', err);
+          setGeneralError('Gagal membaca file Excel. Pastikan file tidak rusak.');
+        }
+      };
+      reader.readAsArrayBuffer(selectedFile);
+    } else {
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setCsvText(e.target.result as string);
+        }
+      };
+      reader.readAsText(selectedFile);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -99,7 +120,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       if (res.success && res.data) {
         setResult(res.data);
       } else {
-        setGeneralError(res.error || 'Terjadi kesalahan format pada file CSV.');
+        setGeneralError(res.error || 'Terjadi kesalahan format pada file unggahan.');
         if (res.data) {
           setResult(res.data);
         }
@@ -119,32 +140,143 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
     setGeneralError(null);
   };
 
+  const handleDownloadTemplate = () => {
+    const headers = [
+      "Tanggal",
+      "Kategori",
+      "Sub-Kategori",
+      "Deskripsi",
+      "Kuantitas",
+      "Satuan",
+      "Harga Satuan",
+      "Pembayaran",
+      "Vendor",
+      "Catatan"
+    ];
+
+    const sampleRows = [
+      [
+        "2026-05-18",
+        "Konsumsi",
+        "Rapat",
+        "Beli makan siang nasi kotak rapat GA",
+        15,
+        "Box",
+        35000,
+        "CASH",
+        "RM Padang Sinar",
+        "Makan siang rapat bulanan GA"
+      ],
+      [
+        "2026-05-19",
+        "Operasional",
+        "ATK",
+        "Pembelian kertas HVS A4 untuk printer",
+        5,
+        "Rim",
+        48000,
+        "PETTY_CASH",
+        "Toko Buku Jaya",
+        "Stok kertas printer kantor"
+      ]
+    ];
+
+    const data = [headers, ...sampleRows];
+    
+    // Create Worksheet
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // Set styling and column widths
+    const wscols = [
+      { wch: 12 }, // Tanggal
+      { wch: 15 }, // Kategori
+      { wch: 15 }, // Sub-Kategori
+      { wch: 30 }, // Deskripsi
+      { wch: 10 }, // Kuantitas
+      { wch: 8 },  // Satuan
+      { wch: 12 }, // Harga Satuan
+      { wch: 12 }, // Pembayaran
+      { wch: 20 }, // Vendor
+      { wch: 30 }  // Catatan
+    ];
+    ws['!cols'] = wscols;
+
+    // Create Workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template Transaksi");
+
+    // Write file & trigger download
+    XLSX.writeFile(wb, "template_import_transaksi.xlsx");
+  };
+
   return (
     <div className={styles.container}>
       <header className={styles.titleBlock}>
         <h2>Impor Transaksi Massal</h2>
-        <p>Unggah file CSV untuk memasukkan data transaksi General Affairs dalam jumlah besar sekaligus.</p>
+        <p>Unggah file Excel atau CSV untuk memasukkan data transaksi General Affairs dalam jumlah besar sekaligus.</p>
       </header>
 
       <div className={styles.card}>
         {/* Specs & Guide banner shown by default unless showing success page */}
         {(!result || result.errors.length > 0) && (
-          <div className={styles.specsBox}>
+          <div className={styles.specsBox} style={{ display: 'flex', gap: 'var(--space-4)' }}>
             <FileSpreadsheet size={24} className={styles.specsIcon} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <span className={styles.specsTitle}>Spesifikasi Header & Format Kolom CSV:</span>
-              <span style={{ display: 'block', fontSize: 'var(--text-xs)', lineHeight: 1.5 }}>
-                Pastikan baris pertama file CSV Anda berisi nama kolom berikut (tidak harus berurutan):
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <span className={styles.specsTitle}>Spesifikasi Header & Format Kolom Excel / CSV:</span>
+              <span style={{ fontSize: 'var(--text-xs)', lineHeight: 1.5 }}>
+                Pastikan baris pertama file Anda berisi nama kolom berikut (tidak harus berurutan):
               </span>
-              <div className={styles.specsHeaders}>
-                Tanggal, Kategori, Sub-Kategori, Deskripsi, Kuantitas, Satuan, Harga Satuan, Pembayaran, Vendor, Catatan
+              
+              {/* Responsive wrapped badges / tags row to prevent overflow */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 6px', marginTop: '6px', marginBottom: '6px' }}>
+                {['Tanggal', 'Kategori', 'Sub-Kategori', 'Deskripsi', 'Kuantitas', 'Satuan', 'Harga Satuan', 'Pembayaran', 'Vendor', 'Catatan'].map(col => (
+                  <span key={col} style={{ 
+                    fontSize: '10px', 
+                    fontFamily: 'var(--font-mono)', 
+                    padding: '2px 8px', 
+                    backgroundColor: 'var(--color-bg)', 
+                    border: '1px solid var(--color-border)', 
+                    borderRadius: '12px', 
+                    color: 'var(--color-text-light)', 
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {col}
+                  </span>
+                ))}
               </div>
-              <ul style={{ margin: 'var(--space-3) 0 0 0', paddingLeft: 'var(--space-4)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+
+              <ul style={{ margin: 'var(--space-2) 0 0 0', paddingLeft: 'var(--space-4)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <li><strong>Tanggal</strong> mendukung format <code style={{ fontWeight: 600 }}>YYYY-MM-DD</code> atau standard Excel Indonesia <code style={{ fontWeight: 600 }}>DD/MM/YYYY</code>.</li>
                 <li><strong>Pembayaran</strong> menerima salah satu nilai berikut: <code style={{ fontWeight: 600 }}>CASH</code>, <code style={{ fontWeight: 600 }}>TRANSFER</code>, atau <code style={{ fontWeight: 600 }}>PETTY_CASH</code>.</li>
                 <li><strong>Kategori Mismatch (Poka-Yoke)</strong>: Jika nama kategori tidak dikenali di database, transaksi otomatis dipetakan ke kategori <code style={{ fontWeight: 600 }}>"Lain-lain"</code>.</li>
                 <li><strong>Relational Rollback (Atomic Safeguard)</strong>: Jika terdapat kesalahan format pada baris mana pun, seluruh impor akan digagalkan dan dibatalkan (rollback) untuk menjaga integritas database.</li>
               </ul>
+
+              <div style={{ marginTop: 'var(--space-4)', borderTop: '1px solid rgba(59, 130, 246, 0.1)', paddingTop: 'var(--space-3)' }}>
+                <button
+                  type="button"
+                  onClick={handleDownloadTemplate}
+                  className="btn btn-secondary btn-sm"
+                  style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: 'var(--space-2)',
+                    borderColor: 'var(--color-primary)',
+                    color: 'var(--color-primary)',
+                    backgroundColor: 'transparent',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    padding: '4px 12px',
+                    height: '30px',
+                    cursor: 'pointer'
+                  }}
+                  title="Unduh file template Excel (.xlsx) sebagai acuan pengisian data"
+                >
+                  <FileSpreadsheet size={14} />
+                  <span>Unduh Template Excel (.xlsx)</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -196,7 +328,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
               <div className={styles.errorBanner}>
                 <AlertTriangle size={24} style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div>
-                  <h4 className={styles.errorTitle}>Impor CSV Ditolak (Database Rollback Aktif)</h4>
+                  <h4 className={styles.errorTitle}>Impor Data Ditolak (Database Rollback Aktif)</h4>
                   <p className={styles.errorSub}>
                     Ditemukan <strong>{result.errors.length}</strong> kesalahan format data. Seluruh pengunggahan dibatalkan demi menjaga integritas keuangan sistem.
                   </p>
@@ -231,7 +363,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
               <div>
                 <h4 className={styles.fileName}>{file.name}</h4>
                 <p className={styles.fileSize}>
-                  {(file.size / 1024).toFixed(1)} KB &bull; Dokumen Tabel CSV
+                  {(file.size / 1024).toFixed(1)} KB &bull; {file.name.endsWith('.csv') ? 'CSV File' : 'Excel Spreadsheet'}
                 </p>
               </div>
             </div>
@@ -254,19 +386,19 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
             onDragLeave={handleDrag}
             onDrop={handleDrop}
             onClick={triggerFileInput}
-            title="Seret file CSV ke sini atau klik untuk memilih file"
+            title="Seret file Excel atau CSV ke sini atau klik untuk memilih file"
           >
             <Upload size={48} className={styles.uploadIcon} />
             <div>
               <p className={styles.dragTitle}>
-                Seret file CSV Anda ke sini, atau <span style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>pilih dari komputer</span>
+                Seret file Excel / CSV Anda ke sini, atau <span style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>pilih dari komputer</span>
               </p>
-              <p className={styles.dragSub}>Hanya diperbolehkan format file berekstensi .csv</p>
+              <p className={styles.dragSub}>Mendukung file dengan ekstensi .xlsx, .xls, atau .csv</p>
             </div>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv"
+              accept=".xlsx, .xls, .csv"
               onChange={handleFileChange}
               style={{ display: 'none' }}
             />
