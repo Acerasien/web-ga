@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { X, Upload, FileSpreadsheet, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react';
 import { importTransactions } from '@/lib/actions/imports';
 import type { CSVImportResult } from '@/lib/actions/imports';
@@ -38,8 +39,11 @@ export default function CSVImportModal({ isOpen, onClose, onImportSuccess }: CSV
   };
 
   const processFile = (selectedFile: File) => {
-    if (!selectedFile.name.endsWith('.csv')) {
-      setGeneralError('Hanya diperbolehkan mengunggah file berformat .csv');
+    const isExcel = selectedFile.name.endsWith('.xlsx') || selectedFile.name.endsWith('.xls');
+    const isCsv = selectedFile.name.endsWith('.csv');
+
+    if (!isExcel && !isCsv) {
+      setGeneralError('Format file salah. Hanya file .csv, .xlsx, atau .xls yang diperbolehkan.');
       setFile(null);
       setCsvText('');
       return;
@@ -50,12 +54,32 @@ export default function CSVImportModal({ isOpen, onClose, onImportSuccess }: CSV
     setResult(null);
 
     const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        setCsvText(e.target.result as string);
-      }
-    };
-    reader.readAsText(selectedFile);
+
+    if (isExcel) {
+      reader.onload = (e) => {
+        try {
+          if (e.target?.result) {
+            const data = new Uint8Array(e.target.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const csvContent = XLSX.utils.sheet_to_csv(worksheet);
+            setCsvText(csvContent);
+          }
+        } catch (err) {
+          console.error('Error parsing Excel file:', err);
+          setGeneralError('Gagal membaca file Excel. Pastikan file tidak rusak.');
+        }
+      };
+      reader.readAsArrayBuffer(selectedFile);
+    } else {
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setCsvText(e.target.result as string);
+        }
+      };
+      reader.readAsText(selectedFile);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -122,7 +146,7 @@ export default function CSVImportModal({ isOpen, onClose, onImportSuccess }: CSV
       <div className={styles.modal} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px' }}>
         {/* Modal Header */}
         <header className={styles.header}>
-          <h3 id="import-title">Unggah Data Transaksi CSV</h3>
+          <h3 id="import-title">Unggah Data Transaksi Excel / CSV</h3>
           <button onClick={onClose} className={styles.closeBtn} aria-label="Tutup Panel Unggah">
             <X size={20} />
           </button>
@@ -136,8 +160,8 @@ export default function CSVImportModal({ isOpen, onClose, onImportSuccess }: CSV
             <div style={{ display: 'flex', gap: 'var(--space-3)', padding: 'var(--space-4)', backgroundColor: 'rgba(59, 130, 246, 0.04)', border: '1px solid rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-lg)', fontSize: 'var(--text-xs)', color: 'var(--color-text-light)' }}>
               <FileSpreadsheet size={24} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
               <div>
-                <strong style={{ display: 'block', color: 'var(--color-text)', marginBottom: '2px' }}>Struktur Kolom CSV yang Diperlukan:</strong>
-                <span>Pastikan file CSV memiliki baris header dengan kolom berikut (urutan bebas):</span>
+                <strong style={{ display: 'block', color: 'var(--color-text)', marginBottom: '2px' }}>Struktur Kolom Excel / CSV yang Diperlukan:</strong>
+                <span>Pastikan file Excel / CSV memiliki baris header dengan kolom berikut (urutan bebas):</span>
                 <span style={{ display: 'block', marginTop: '4px', fontFamily: 'monospace', padding: '4px', backgroundColor: 'var(--color-bg)', borderRadius: '4px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
                   Tanggal, Kategori, Sub-Kategori, Deskripsi, Kuantitas, Satuan, Harga Satuan, Pembayaran, Vendor, Catatan
                 </span>
@@ -236,7 +260,7 @@ export default function CSVImportModal({ isOpen, onClose, onImportSuccess }: CSV
                     {file.name}
                   </h4>
                   <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    {(file.size / 1024).toFixed(1)} KB &bull; CSV Spreadsheet
+                    {(file.size / 1024).toFixed(1)} KB &bull; {file.name.endsWith('.csv') ? 'CSV File' : 'Excel Spreadsheet'}
                   </p>
                 </div>
               </div>
@@ -260,21 +284,21 @@ export default function CSVImportModal({ isOpen, onClose, onImportSuccess }: CSV
               onDrop={handleDrop}
               onClick={triggerFileInput}
               style={{ minHeight: '200px', borderStyle: 'dashed', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}
-              title="Seret file CSV ke sini atau klik untuk memilih file"
+              title="Seret file Excel atau CSV ke sini atau klik untuk memilih file"
             >
               <Upload size={36} style={{ color: 'var(--color-text-muted)' }} />
               <div style={{ textAlign: 'center' }}>
                 <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text)', margin: '0 0 4px 0' }}>
-                  Seret file CSV ke sini, atau <span style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>klik untuk browsing</span>
+                  Seret file Excel / CSV ke sini, atau <span style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>klik untuk browsing</span>
                 </p>
                 <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', margin: 0 }}>
-                  Hanya diperbolehkan file dengan format .csv
+                  Dukung file dengan format .xlsx, .xls, atau .csv
                 </p>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv"
+                accept=".xlsx, .xls, .csv"
                 onChange={handleFileChange}
                 style={{ display: 'none' }}
               />

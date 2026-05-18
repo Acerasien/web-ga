@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { 
   Wallet, 
   Receipt, 
@@ -194,6 +195,124 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
     }
   };
 
+  // Perform client-side Microsoft Excel Export (.xlsx)
+  const handleExportExcel = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      // Determine date ranges for the search query
+      let startDateStr: string | undefined = undefined;
+      let endDateStr: string | undefined = undefined;
+
+      if (period === 'YEARLY') {
+        startDateStr = `${year - 4}-01-01`;
+        endDateStr = `${year}-12-31`;
+      } else {
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const formattedMonth = String(month).padStart(2, '0');
+        startDateStr = `${year}-${formattedMonth}-01`;
+        endDateStr = `${year}-${formattedMonth}-${daysInMonth}`;
+      }
+
+      const result = await getTransactions({
+        branchId: branchId ? Number(branchId) : undefined,
+        startDate: startDateStr,
+        endDate: endDateStr,
+        page: 1,
+        limit: 10000 // Query full dataset ignoring pagination limits
+      });
+
+      if (!result.success || !result.data || result.data.transactions.length === 0) {
+        alert('Tidak ada transaksi terekam untuk kriteria filter ini.');
+        setExporting(false);
+        return;
+      }
+
+      // 1. Prepare raw data for SheetJS worksheet
+      const headers = [
+        'Tanggal', 
+        'Cabang', 
+        'Kategori', 
+        'Sub-Kategori', 
+        'Deskripsi', 
+        'Kuantitas', 
+        'Satuan', 
+        'Harga Satuan', 
+        'Total Biaya', 
+        'Pembayaran', 
+        'Vendor', 
+        'Catatan', 
+        'Pencatat'
+      ];
+      
+      const rows = result.data.transactions.map(tx => [
+        new Date(tx.transactionDate).toLocaleDateString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+        `${tx.branch.name} (${tx.branch.code})`,
+        tx.category.name,
+        tx.subCategory?.name || '',
+        tx.description,
+        Number(tx.quantity),
+        tx.unit,
+        Number(tx.pricePerUnit),
+        Number(tx.totalAmount),
+        tx.paymentMethod === 'PETTY_CASH' ? 'Kas Kecil' : tx.paymentMethod === 'TRANSFER' ? 'Transfer Bank' : 'Tunai',
+        tx.vendor || '',
+        tx.notes || '',
+        tx.user.fullName
+      ]);
+
+      // 2. Build SheetJS Workbook & Worksheet
+      const wsData = [headers, ...rows];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      
+      // 3. Apply cell formatting for premium financial reports
+      // Set custom column widths to prevent ### truncation or squished content
+      const colsWidth = [
+        { wch: 12 }, // Tanggal
+        { wch: 22 }, // Cabang
+        { wch: 18 }, // Kategori
+        { wch: 18 }, // Sub-Kategori
+        { wch: 28 }, // Deskripsi
+        { wch: 10 }, // Kuantitas
+        { wch: 10 }, // Satuan
+        { wch: 15 }, // Harga Satuan
+        { wch: 18 }, // Total Biaya
+        { wch: 15 }, // Pembayaran
+        { wch: 20 }, // Vendor
+        { wch: 20 }, // Catatan
+        { wch: 18 }  // Pencatat
+      ];
+      ws['!cols'] = colsWidth;
+
+      // 4. Format price columns as standard currency numbers (Rp #,##0)
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+      for (let r = 1; r <= range.e.r; r++) {
+        // Price per unit (Col index 7 / 'H')
+        const cellPrice = ws[XLSX.utils.encode_cell({ r, c: 7 })];
+        if (cellPrice && cellPrice.t === 'n') {
+          cellPrice.z = '"Rp "#,##0';
+        }
+        // Total amount (Col index 8 / 'I')
+        const cellTotal = ws[XLSX.utils.encode_cell({ r, c: 8 })];
+        if (cellTotal && cellTotal.t === 'n') {
+          cellTotal.z = '"Rp "#,##0';
+        }
+      }
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Laporan GA');
+
+      // 5. Trigger binary xlsx file download directly inside the browser
+      XLSX.writeFile(wb, `Laporan_GA_${period}_${year}_${month}.xlsx`);
+
+    } catch (err) {
+      console.error('Excel Export failure:', err);
+      alert('Terjadi kesalahan saat memproses unduhan Excel.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className={styles.container}>
       {/* Header Block */}
@@ -203,16 +322,17 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
           <p className="text-muted" style={{ margin: 0 }}>Analisis pengeluaran General Affairs dengan grafis interaktif dan utilitas import/export.</p>
         </div>
         
-        {/* CSV Import/Export Buttons */}
+        {/* Excel & CSV Import/Export Buttons */}
         <div className={styles.actionsRow}>
           <button 
             type="button" 
-            onClick={handleExportCSV} 
+            onClick={handleExportExcel} 
             className={`${styles.actionBtn} ${styles.exportBtn}`}
             disabled={exporting}
+            style={{ backgroundColor: '#107c41', borderColor: '#107c41', color: '#fff' }}
           >
-            <Download size={16} />
-            <span>{exporting ? 'Mengekspor...' : 'Ekspor CSV'}</span>
+            <FileSpreadsheet size={16} />
+            <span>{exporting ? 'Mengekspor...' : 'Ekspor Excel (.xlsx)'}</span>
           </button>
           
           {user.role !== 'VIEWER' && (
@@ -222,7 +342,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
               className={`${styles.actionBtn} ${styles.importBtn}`}
             >
               <Upload size={16} />
-              <span>Unggah CSV Bulk</span>
+              <span>Unggah Excel / CSV</span>
             </button>
           )}
         </div>
