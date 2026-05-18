@@ -135,6 +135,75 @@ export default function CSVImportModal({ isOpen, onClose, onImportSuccess }: CSV
     setGeneralError(null);
   };
 
+  const handleDownloadTemplate = () => {
+    const headers = [
+      "Tanggal",
+      "Kategori",
+      "Sub-Kategori",
+      "Deskripsi",
+      "Kuantitas",
+      "Satuan",
+      "Harga Satuan",
+      "Pembayaran",
+      "Vendor",
+      "Catatan"
+    ];
+
+    const sampleRows = [
+      [
+        "2026-05-18",
+        "Konsumsi",
+        "Rapat",
+        "Beli makan siang nasi kotak rapat GA",
+        15,
+        "Box",
+        35000,
+        "CASH",
+        "RM Padang Sinar",
+        "Makan siang rapat bulanan GA"
+      ],
+      [
+        "2026-05-19",
+        "Operasional",
+        "ATK",
+        "Pembelian kertas HVS A4 untuk printer",
+        5,
+        "Rim",
+        48000,
+        "PETTY_CASH",
+        "Toko Buku Jaya",
+        "Stok kertas printer kantor"
+      ]
+    ];
+
+    const data = [headers, ...sampleRows];
+    
+    // Create Worksheet
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // Set styling and column widths
+    const wscols = [
+      { wch: 12 }, // Tanggal
+      { wch: 15 }, // Kategori
+      { wch: 15 }, // Sub-Kategori
+      { wch: 30 }, // Deskripsi
+      { wch: 10 }, // Kuantitas
+      { wch: 8 },  // Satuan
+      { wch: 12 }, // Harga Satuan
+      { wch: 12 }, // Pembayaran
+      { wch: 20 }, // Vendor
+      { wch: 30 }  // Catatan
+    ];
+    ws['!cols'] = wscols;
+
+    // Create Workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template Transaksi");
+
+    // Write file & trigger download
+    XLSX.writeFile(wb, "template_import_transaksi.xlsx");
+  };
+
   return (
     <div 
       className={styles.backdrop} 
@@ -159,7 +228,7 @@ export default function CSVImportModal({ isOpen, onClose, onImportSuccess }: CSV
           {!result && (
             <div style={{ display: 'flex', gap: 'var(--space-3)', padding: 'var(--space-4)', backgroundColor: 'rgba(59, 130, 246, 0.04)', border: '1px solid rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-lg)', fontSize: 'var(--text-xs)', color: 'var(--color-text-light)' }}>
               <FileSpreadsheet size={24} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
                 <strong style={{ display: 'block', color: 'var(--color-text)', marginBottom: '2px' }}>Struktur Kolom Excel / CSV yang Diperlukan:</strong>
                 <span>Pastikan file Excel / CSV memiliki baris header dengan kolom berikut (urutan bebas):</span>
                 <span style={{ display: 'block', marginTop: '4px', fontFamily: 'monospace', padding: '4px', backgroundColor: 'var(--color-bg)', borderRadius: '4px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
@@ -171,6 +240,31 @@ export default function CSVImportModal({ isOpen, onClose, onImportSuccess }: CSV
                 <span style={{ display: 'block', marginTop: '2px', fontSize: '10px' }}>
                   * Kategori yang tidak terdaftar otomatis dimasukkan ke <code style={{ fontWeight: 600 }}>"Lain-lain"</code>.
                 </span>
+
+                <div style={{ marginTop: 'var(--space-3)', borderTop: '1px solid rgba(59, 130, 246, 0.1)', paddingTop: 'var(--space-2)' }}>
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="btn btn-secondary btn-sm"
+                    style={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: 'var(--space-2)',
+                      borderColor: 'var(--color-primary)',
+                      color: 'var(--color-primary)',
+                      backgroundColor: 'transparent',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      padding: '4px 10px',
+                      height: '28px',
+                      cursor: 'pointer'
+                    }}
+                    title="Unduh file template Excel (.xlsx) sebagai acuan pengisian data"
+                  >
+                    <FileSpreadsheet size={14} />
+                    <span>Unduh Template Excel (.xlsx)</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
