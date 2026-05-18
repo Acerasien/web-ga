@@ -231,9 +231,23 @@ export default function CSVImportModal({ isOpen, onClose, onImportSuccess }: CSV
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
                 <strong style={{ display: 'block', color: 'var(--color-text)', marginBottom: '2px' }}>Struktur Kolom Excel / CSV yang Diperlukan:</strong>
                 <span>Pastikan file Excel / CSV memiliki baris header dengan kolom berikut (urutan bebas):</span>
-                <span style={{ display: 'block', marginTop: '4px', fontFamily: 'monospace', padding: '4px', backgroundColor: 'var(--color-bg)', borderRadius: '4px', overflowX: 'auto', whiteSpace: 'nowrap' }}>
-                  Tanggal, Kategori, Sub-Kategori, Deskripsi, Kuantitas, Satuan, Harga Satuan, Pembayaran, Vendor, Catatan
-                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 6px', marginTop: '6px', marginBottom: '6px' }}>
+                  {['Tanggal', 'Kategori', 'Sub-Kategori', 'Deskripsi', 'Kuantitas', 'Satuan', 'Harga Satuan', 'Pembayaran', 'Vendor', 'Catatan'].map(col => (
+                    <span key={col} style={{ 
+                      fontSize: '10px', 
+                      fontFamily: 'monospace', 
+                      padding: '2px 8px', 
+                      backgroundColor: 'var(--color-bg)', 
+                      border: '1px solid var(--color-border)', 
+                      borderRadius: '12px', 
+                      color: 'var(--color-text-light)', 
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {col}
+                    </span>
+                  ))}
+                </div>
                 <span style={{ display: 'block', marginTop: '4px', fontSize: '10px' }}>
                   * Tanggal mendukung format <code style={{ fontWeight: 600 }}>YYYY-MM-DD</code> atau <code style={{ fontWeight: 600 }}>DD/MM/YYYY</code>.
                 </span>
