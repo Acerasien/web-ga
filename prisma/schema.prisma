@@ -1,0 +1,136 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  SUPERADMIN
+  DATA_ENTRY
+  VIEWER
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  PETTY_CASH
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
+/// Cabang / Site perusahaan
+model Branch {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  code      String   @unique @db.VarChar(10)
+  address   String?  @db.Text
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  users        User[]
+  transactions Transaction[]
+
+  @@map("branches")
+}
+
+/// Pengguna sistem
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique @db.VarChar(50)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  fullName     String   @map("full_name") @db.VarChar(100)
+  role         UserRole @default(DATA_ENTRY)
+  branchId     Int?     @map("branch_id")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  branch       Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  transactions Transaction[]
+
+  @@map("users")
+}
+
+/// Kategori pengeluaran (e.g., Makanan & Minuman, Utilitas, ATK)
+model Category {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(100)
+  code         String   @unique @db.VarChar(20)
+  icon         String?  @db.VarChar(50)
+  isSystem     Boolean  @default(false) @map("is_system")
+  fieldsConfig Json?    @map("fields_config") @db.JsonB
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  subCategories SubCategory[]
+  transactions  Transaction[]
+
+  @@map("categories")
+}
+
+/// Sub-kategori (e.g., Susu, Listrik, Kertas)
+model SubCategory {
+  id         Int      @id @default(autoincrement())
+  categoryId Int      @map("category_id")
+  name       String   @db.VarChar(100)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  category     Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("sub_categories")
+}
+
+/// Transaksi pengeluaran GA
+model Transaction {
+  id              Int           @id @default(autoincrement())
+  branchId        Int           @map("branch_id")
+  userId          Int           @map("user_id")
+  categoryId      Int           @map("category_id")
+  subCategoryId   Int?          @map("sub_category_id")
+  transactionDate DateTime      @map("transaction_date") @db.Date
+  description     String        @db.VarChar(255)
+  quantity        Decimal       @db.Decimal(10, 2)
+  unit            String        @db.VarChar(20)
+  pricePerUnit    Decimal       @map("price_per_unit") @db.Decimal(15, 2)
+  totalAmount     Decimal       @map("total_amount") @db.Decimal(15, 2)
+  paymentMethod   PaymentMethod @map("payment_method")
+  vendor          String?       @db.VarChar(100)
+  receiptPath     String?       @map("receipt_path") @db.VarChar(500)
+  notes           String?       @db.Text
+  customFields    Json?         @map("custom_fields") @db.JsonB
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  branch      Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  category    Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subCategory SubCategory? @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+
+  // Indexes for performance (per database-design skill)
+  @@index([branchId, transactionDate(sort: Desc)], name: "idx_tx_branch_date")
+  @@index([categoryId], name: "idx_tx_category")
+  @@index([userId], name: "idx_tx_user")
+  @@index([transactionDate(sort: Desc)], name: "idx_tx_date")
+  @@index([paymentMethod], name: "idx_tx_payment")
+
+  @@map("transactions")
+}

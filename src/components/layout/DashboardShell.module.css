@@ -1,0 +1,56 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.mainContainer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+  background-color: var(--color-bg);
+  /* On desktop, pad content left to clear the fixed sidebar */
+  transition: padding-left var(--transition-slow);
+}
+
+.content {
+  flex: 1;
+  padding: var(--space-5);
+  /* Safe bottom padding on mobile to clear bottom nav */
+  padding-bottom: calc(var(--space-6) + var(--bottom-nav-height));
+  display: flex;
+  flex-direction: column;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: calc(var(--z-fixed) - 1);
+  animation: fadeIn var(--transition-fast);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ============================================================
+   Desktop layout rules
+   ============================================================ */
+@media (min-width: 1024px) {
+  .mainContainer {
+    padding-left: var(--sidebar-width);
+  }
+
+  .mainContainer.collapsed {
+    padding-left: var(--sidebar-collapsed);
+  }
+
+  .content {
+    padding: var(--space-8);
+    padding-bottom: var(--space-8); /* Reset mobile padding */
+  }
+}

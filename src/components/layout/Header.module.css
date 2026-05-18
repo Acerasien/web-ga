@@ -1,0 +1,89 @@
+/* Header Styles */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  min-height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.menuBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.menuBtn:hover {
+  background: var(--color-bg);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.userBadge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.userName {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.userRole {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* Hide hamburger on desktop (sidebar is visible) */
+@media (min-width: 1024px) {
+  .menuBtn {
+    display: none;
+  }
+}
+
+/* On mobile, smaller title */
+@media (max-width: 767px) {
+  .header {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .title {
+    font-size: var(--text-lg);
+  }
+
+  .userBadge {
+    display: none;
+  }
+}

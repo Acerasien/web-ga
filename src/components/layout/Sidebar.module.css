@@ -1,0 +1,222 @@
+/* Sidebar Styles */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: var(--sidebar-width);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  z-index: var(--z-fixed);
+  transition: width var(--transition-slow);
+  overflow: hidden;
+}
+
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed);
+}
+
+/* Brand */
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5) var(--space-4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 72px;
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.brandName {
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: white;
+  line-height: 1.2;
+}
+
+.brandSub {
+  font-size: var(--text-xs);
+  color: var(--sidebar-text);
+  opacity: 0.7;
+}
+
+.collapseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--sidebar-text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.collapseBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Navigation */
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-3);
+}
+
+.navList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--sidebar-text);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 44px;
+  text-decoration: none;
+}
+
+.navItem:hover {
+  background: var(--sidebar-hover);
+  color: white;
+}
+
+.navItem.active {
+  background: var(--sidebar-active);
+  color: white;
+  font-weight: 600;
+}
+
+.navDivider {
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.35);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: var(--space-2);
+}
+
+/* Footer - User Info */
+.footer {
+  padding: var(--space-4);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.userAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+
+.userDetails {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.userName {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userRole {
+  font-size: var(--text-xs);
+  color: var(--sidebar-text);
+  opacity: 0.7;
+}
+
+.logoutBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  min-height: 40px;
+}
+
+.logoutBtn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-danger);
+}
+
+.mobileOpen {
+  opacity: 1;
+}
+
+/* ============================================================
+   Slide-in Sidebar Drawer on mobile
+   ============================================================ */
+@media (max-width: 1023px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: var(--z-modal);
+    width: var(--sidebar-width);
+    height: 100vh;
+    box-shadow: var(--shadow-xl);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.3s ease, visibility 0.3s ease;
+    display: flex; /* Maintain flex container layout */
+  }
+
+  .mobileOpen {
+    transform: translateX(0) !important;
+    visibility: visible !important;
+  }
+
+  .collapseBtn {
+    display: none;
+  }
+}
