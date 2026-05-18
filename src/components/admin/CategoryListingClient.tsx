@@ -169,7 +169,6 @@ export default function CategoryListingClient() {
                     >
                       <td style={{ fontWeight: 600, color: 'var(--color-text)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                          <span style={{ fontSize: 'var(--text-base)' }}>{c.icon || '📁'}</span>
                           <span>{c.name}</span>
                         </div>
                       </td>
