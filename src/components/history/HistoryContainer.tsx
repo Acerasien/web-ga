@@ -47,6 +47,18 @@ export default function HistoryContainer({ user, categories, branches }: History
   const [sortBy, setSortBy] = useState<string>('transactionDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
+  // Advanced Filters toggle state
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
+
+  // Active filters count for visual badge
+  const activeFiltersCount = [
+    branchId,
+    categoryId,
+    paymentMethod,
+    startDate,
+    endDate,
+  ].filter(Boolean).length;
+
   // Queries States
   const [transactions, setTransactions] = useState<TransactionWithRelations[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -172,149 +184,165 @@ export default function HistoryContainer({ user, categories, branches }: History
 
       {/* Filter Card */}
       <section className={styles.filterCard}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--color-text)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>
-          <Filter size={16} />
-          <span>Panel Penyaringan</span>
-        </div>
-
-        <div className={styles.filterGrid}>
-          {/* SUPERADMIN Only: Branch Dropdown */}
-          {user.role === 'SUPERADMIN' ? (
-            <div className={styles.filterGroup}>
-              <label htmlFor="branch-filter" className={styles.label}>Cabang</label>
-              <select
-                id="branch-filter"
-                className={styles.input}
-                value={branchId}
-                onChange={(e) => handleFilterChange(setBranchId, e.target.value)}
-              >
-                <option value="">Semua Cabang</option>
-                {branches.map(b => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            // Non-Superadmin: Lock display layout to clarify context
-            <div className={styles.filterGroup}>
-              <label className={styles.label}>Cabang Terkunci</label>
-              <input
-                type="text"
-                className={styles.input}
-                value={user.branchId ? branches.find(b => b.id === user.branchId)?.name || 'Cabang Terdaftar' : '-'}
-                disabled
-              />
-            </div>
-          )}
-
-          {/* Category Dropdown */}
-          <div className={styles.filterGroup}>
-            <label htmlFor="category-filter" className={styles.label}>Kategori</label>
-            <select
-              id="category-filter"
-              className={styles.input}
-              value={categoryId}
-              onChange={(e) => handleFilterChange(setCategoryId, e.target.value)}
-            >
-              <option value="">Semua Kategori</option>
-              {categories.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Payment Method Dropdown */}
-          <div className={styles.filterGroup}>
-            <label htmlFor="payment-filter" className={styles.label}>Pembayaran</label>
-            <select
-              id="payment-filter"
-              className={styles.input}
-              value={paymentMethod}
-              onChange={(e) => handleFilterChange(setPaymentMethod, e.target.value)}
-            >
-              <option value="">Semua Metode</option>
-              <option value="CASH">Tunai (Cash)</option>
-              <option value="TRANSFER">Transfer Bank</option>
-              <option value="PETTY_CASH">Kas Kecil (Petty Cash)</option>
-            </select>
-          </div>
-
-          {/* Start Date */}
-          <div className={styles.filterGroup}>
-            <label htmlFor="start-date-filter" className={styles.label}>Mulai Tanggal</label>
-            <input
-              id="start-date-filter"
-              type="date"
-              className={styles.input}
-              value={startDate}
-              onChange={(e) => handleFilterChange(setStartDate, e.target.value)}
-            />
-          </div>
-
-          {/* End Date */}
-          <div className={styles.filterGroup}>
-            <label htmlFor="end-date-filter" className={styles.label}>Hingga Tanggal</label>
-            <input
-              id="end-date-filter"
-              type="date"
-              className={styles.input}
-              value={endDate}
-              onChange={(e) => handleFilterChange(setEndDate, e.target.value)}
-            />
-          </div>
-
-          {/* Sorting Dropdown (Highly Mobile Friendly) */}
-          <div className={styles.filterGroup}>
-            <label htmlFor="sort-filter" className={styles.label}>Urutkan</label>
-            <select
-              id="sort-filter"
-              className={styles.input}
-              value={`${sortBy}-${sortOrder}`}
-              onChange={(e) => {
-                const [field, order] = e.target.value.split('-');
-                setSortBy(field);
-                setSortOrder(order as 'asc' | 'desc');
-                setPage(1);
-              }}
-            >
-              <option value="transactionDate-desc">Tanggal (Terbaru)</option>
-              <option value="transactionDate-asc">Tanggal (Terlama)</option>
-              <option value="totalAmount-desc">Total Biaya (Tertinggi)</option>
-              <option value="totalAmount-asc">Total Biaya (Terendah)</option>
-              <option value="category-asc">Kategori (A - Z)</option>
-              <option value="category-desc">Kategori (Z - A)</option>
-              {user.role === 'SUPERADMIN' && (
-                <>
-                  <option value="branch-asc">Cabang (A - Z)</option>
-                  <option value="branch-desc">Cabang (Z - A)</option>
-                </>
-              )}
-            </select>
-          </div>
-        </div>
-
-        {/* Bottom Search & Action bar */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--space-4)', alignItems: 'center', marginTop: 'var(--space-2)' }}>
-          <div style={{ position: 'relative' }}>
+        {/* Modern Primary Toolbar Row */}
+        <div className={styles.toolbarRow}>
+          <div className={styles.searchWrapper}>
             <input
               type="text"
-              className={styles.input}
+              className={styles.searchInput}
               placeholder="Cari deskripsi kebutuhan, vendor toko, catatan tambahan..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ paddingLeft: 'var(--space-10)' }}
             />
-            <Search size={16} style={{ position: 'absolute', left: 'var(--space-4)', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+            <Search size={18} style={{ position: 'absolute', left: 'var(--space-4)', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)', opacity: 0.6 }} />
           </div>
-          <button 
-            type="button" 
-            onClick={handleResetFilters} 
-            className="btn btn-secondary"
-            style={{ height: '38px', minWidth: '100px' }}
-          >
-            Reset Filter
-          </button>
+
+          <div className={styles.actionButtons}>
+            <button
+              type="button"
+              onClick={() => setShowAdvancedFilters(prev => !prev)}
+              className={`${styles.toggleBtn} ${showAdvancedFilters ? styles.toggleActive : ''}`}
+              title="Tampilkan Penyaringan Lanjutan"
+            >
+              <Filter size={16} />
+              <span>Filter Lanjutan</span>
+              {activeFiltersCount > 0 && (
+                <span className={styles.badge}>{activeFiltersCount}</span>
+              )}
+            </button>
+
+            {(search || activeFiltersCount > 0) && (
+              <button 
+                type="button" 
+                onClick={handleResetFilters} 
+                className={styles.resetBtn}
+                title="Reset Semua Penyaringan"
+              >
+                Reset Filter
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Collapsible Advanced Filters Slide-Down Panel */}
+        {showAdvancedFilters && (
+          <div className={styles.advancedPanel}>
+            <div className={styles.advancedGrid}>
+              {/* Row 1, Col 1: Cabang */}
+              {user.role === 'SUPERADMIN' ? (
+                <div className={styles.filterGroup}>
+                  <label htmlFor="branch-filter" className={styles.label}>Cabang</label>
+                  <select
+                    id="branch-filter"
+                    className={styles.input}
+                    value={branchId}
+                    onChange={(e) => handleFilterChange(setBranchId, e.target.value)}
+                  >
+                    <option value="">Semua Cabang</option>
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className={styles.filterGroup}>
+                  <label className={styles.label}>Cabang Terkunci</label>
+                  <input
+                    type="text"
+                    className={styles.input}
+                    value={user.branchId ? branches.find(b => b.id === user.branchId)?.name || 'Cabang Terdaftar' : '-'}
+                    disabled
+                  />
+                </div>
+              )}
+
+              {/* Row 1, Col 2: Kategori */}
+              <div className={styles.filterGroup}>
+                <label htmlFor="category-filter" className={styles.label}>Kategori</label>
+                <select
+                  id="category-filter"
+                  className={styles.input}
+                  value={categoryId}
+                  onChange={(e) => handleFilterChange(setCategoryId, e.target.value)}
+                >
+                  <option value="">Semua Kategori</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Row 1, Col 3: Pembayaran */}
+              <div className={styles.filterGroup}>
+                <label htmlFor="payment-filter" className={styles.label}>Metode Pembayaran</label>
+                <select
+                  id="payment-filter"
+                  className={styles.input}
+                  value={paymentMethod}
+                  onChange={(e) => handleFilterChange(setPaymentMethod, e.target.value)}
+                >
+                  <option value="">Semua Metode</option>
+                  <option value="CASH">Tunai (Cash)</option>
+                  <option value="TRANSFER">Transfer Bank</option>
+                  <option value="PETTY_CASH">Kas Kecil (Petty Cash)</option>
+                </select>
+              </div>
+
+              {/* Row 2, Col 1: Start Date */}
+              <div className={styles.filterGroup}>
+                <label htmlFor="start-date-filter" className={styles.label}>Mulai Tanggal</label>
+                <input
+                  id="start-date-filter"
+                  type="date"
+                  className={styles.input}
+                  value={startDate}
+                  onChange={(e) => handleFilterChange(setStartDate, e.target.value)}
+                />
+              </div>
+
+              {/* Row 2, Col 2: End Date */}
+              <div className={styles.filterGroup}>
+                <label htmlFor="end-date-filter" className={styles.label}>Hingga Tanggal</label>
+                <input
+                  id="end-date-filter"
+                  type="date"
+                  className={styles.input}
+                  value={endDate}
+                  onChange={(e) => handleFilterChange(setEndDate, e.target.value)}
+                />
+              </div>
+
+              {/* Row 2, Col 3: Sorting */}
+              <div className={styles.filterGroup}>
+                <label htmlFor="sort-filter" className={styles.label}>Urutan Tampilan</label>
+                <select
+                  id="sort-filter"
+                  className={styles.input}
+                  value={`${sortBy}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [field, order] = e.target.value.split('-');
+                    setSortBy(field);
+                    setSortOrder(order as 'asc' | 'desc');
+                    setPage(1);
+                  }}
+                >
+                  <option value="transactionDate-desc">Tanggal (Terbaru)</option>
+                  <option value="transactionDate-asc">Tanggal (Terlama)</option>
+                  <option value="totalAmount-desc">Total Biaya (Tertinggi)</option>
+                  <option value="totalAmount-asc">Total Biaya (Terendah)</option>
+                  <option value="category-asc">Kategori (A - Z)</option>
+                  <option value="category-desc">Kategori (Z - A)</option>
+                  {user.role === 'SUPERADMIN' && (
+                    <>
+                      <option value="branch-asc">Cabang (A - Z)</option>
+                      <option value="branch-desc">Cabang (Z - A)</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Main Table Card */}
