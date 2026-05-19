@@ -302,6 +302,15 @@ img {
   background: var(--color-accent-hover);
 }
 
+.btn-secondary {
+  background: #E2E8F0;
+  color: var(--color-text);
+  border-color: transparent;
+}
+.btn-secondary:hover:not(:disabled) {
+  background: #CBD5E1;
+}
+
 .btn-outline {
   background: transparent;
   color: var(--color-text);

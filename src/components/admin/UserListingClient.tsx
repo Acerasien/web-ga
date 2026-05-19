@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { 
   Search, 
   UserPlus, 
@@ -10,7 +11,8 @@ import {
   Check, 
   User as UserIcon,
   ShieldAlert,
-  Building
+  Building,
+  Eye
 } from 'lucide-react';
 import { getUsers, createUser, updateUser, adminResetPassword } from '@/lib/actions/users';
 import type { UserDetailPayload } from '@/lib/actions/users';
@@ -342,6 +344,14 @@ export default function UserListingClient({ branches }: UserListingClientProps) 
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: 'var(--space-2)' }}>
+                        <Link
+                          href={`/admin/users/${u.id}`}
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '4px var(--space-2)', minHeight: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary)' }}
+                          title="Audit Detail Transaksi"
+                        >
+                          <Eye size={12} />
+                        </Link>
                         <button
                           type="button"
                           onClick={() => openEditModal(u)}

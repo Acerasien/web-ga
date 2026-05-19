@@ -3,9 +3,10 @@
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/actions/auth';
 import type { ApiResponse } from '@/types';
-import { UserRole } from '@prisma/client';
+import { UserRole, Prisma } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { revalidatePath } from 'next/cache';
+import type { TransactionWithRelations } from './transactions';
 
 export interface UserFilters {
   search?: string;
@@ -367,6 +368,158 @@ export async function adminResetPassword(
     return {
       success: false,
       error: 'Terjadi kesalahan sistem saat mereset password pengguna.',
+    };
+  }
+}
+
+/**
+ * Server Action to fetch a single user's detailed metadata by ID (Superadmin Only).
+ */
+export async function getUserById(id: number): Promise<ApiResponse<UserDetailPayload>> {
+  try {
+    const actor = await getCurrentUser();
+    if (!actor || actor.role !== 'SUPERADMIN') {
+      return {
+        success: false,
+        error: 'Akses Ditolak: Hanya SUPERADMIN yang diizinkan melihat detail pengguna.',
+      };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        branch: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return {
+        success: false,
+        error: 'Staff GA tidak ditemukan.',
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        id: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        role: user.role,
+        branchId: user.branchId,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        branch: user.branch,
+      },
+    };
+  } catch (error) {
+    console.error('Error in getUserById server action:', error);
+    return {
+      success: false,
+      error: 'Terjadi kesalahan sistem saat memuat profil staff.',
+    };
+  }
+}
+
+/**
+ * Server Action to fetch transaction histories inputted by a specific staff user (Superadmin Only).
+ */
+export async function getUserTransactionHistory(
+  userId: number,
+  filters: {
+    page: number;
+    limit: number;
+    startDate?: string;
+    endDate?: string;
+  }
+): Promise<
+  ApiResponse<{
+    transactions: TransactionWithRelations[];
+    totalCount: number;
+    totalPages: number;
+    currentPage: number;
+  }>
+> {
+  try {
+    const actor = await getCurrentUser();
+    if (!actor || actor.role !== 'SUPERADMIN') {
+      return {
+        success: false,
+        error: 'Akses Ditolak: Hanya SUPERADMIN yang diizinkan mengakses log audit.',
+      };
+    }
+
+    const { page, limit, startDate, endDate } = filters;
+    const skip = (page - 1) * limit;
+    const take = limit;
+
+    const where: Prisma.TransactionWhereInput = {
+      userId,
+    };
+
+    if (startDate || endDate) {
+      where.transactionDate = {};
+      if (startDate) {
+        where.transactionDate.gte = new Date(startDate);
+      }
+      if (endDate) {
+        where.transactionDate.lte = new Date(endDate);
+      }
+    }
+
+    // Execute queries in parallel using DB indexed userId
+    const [transactions, totalCount] = await Promise.all([
+      prisma.transaction.findMany({
+        where,
+        include: {
+          category: true,
+          subCategory: true,
+          branch: true,
+          user: {
+            select: {
+              fullName: true,
+              username: true,
+            },
+          },
+        },
+        orderBy: {
+          transactionDate: 'desc',
+        },
+        skip,
+        take,
+      }),
+      prisma.transaction.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    const serializedTransactions: TransactionWithRelations[] = transactions.map((t) => ({
+      ...t,
+      quantity: Number(t.quantity),
+      pricePerUnit: Number(t.pricePerUnit),
+      totalAmount: Number(t.totalAmount),
+    }));
+
+    return {
+      success: true,
+      data: {
+        transactions: serializedTransactions,
+        totalCount,
+        totalPages,
+        currentPage: page,
+      },
+    };
+  } catch (error) {
+    console.error('Error in getUserTransactionHistory server action:', error);
+    return {
+      success: false,
+      error: 'Terjadi kesalahan sistem saat memuat riwayat transaksi staff.',
     };
   }
 }

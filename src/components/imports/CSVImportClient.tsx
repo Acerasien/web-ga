@@ -15,6 +15,7 @@ import {
 import { importTransactions } from '@/lib/actions/imports';
 import type { CSVImportResult } from '@/lib/actions/imports';
 import type { AuthUser } from '@/types';
+import { formatRupiah, formatPaymentMethod } from '@/lib/formatters';
 import styles from '@/app/(dashboard)/transaksi/import/import.module.css';
 
 interface CSVImportClientProps {
@@ -26,6 +27,14 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
   const [file, setFile] = useState<File | null>(null);
   const [csvText, setCsvText] = useState<string>('');
   
+  // Preview states
+  const [previewRows, setPreviewRows] = useState<any[]>([]);
+  const [previewSummary, setPreviewSummary] = useState<{
+    totalRows: number;
+    totalAmount: number;
+    hasErrors: boolean;
+  } | null>(null);
+
   // Importer states
   const [loading, setLoading] = useState<boolean>(false);
   const [result, setResult] = useState<CSVImportResult | null>(null);
@@ -44,6 +53,106 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
     }
   };
 
+  const generatePreview = (worksheet: XLSX.WorkSheet) => {
+    try {
+      const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+      if (rawRows.length < 2) {
+        setPreviewRows([]);
+        setPreviewSummary({ totalRows: 0, totalAmount: 0, hasErrors: true });
+        return;
+      }
+
+      // Map headers dynamically (case-insensitive and trimmed)
+      const headers = rawRows[0].map((h: any) => String(h || '').trim().toLowerCase());
+      
+      const idxDate = headers.findIndex(h => h.includes('tanggal') || h.includes('date'));
+      const idxCategory = headers.findIndex(h => h.includes('kategori') || h.includes('category'));
+      const idxSubCategory = headers.findIndex(h => h.includes('sub-kategori') || h.includes('subcategory') || h.includes('subkategori'));
+      const idxDescription = headers.findIndex(h => h.includes('deskripsi') || h.includes('description') || h.includes('kebutuhan'));
+      const idxQuantity = headers.findIndex(h => h.includes('kuantitas') || h.includes('jumlah') || h.includes('qty') || h.includes('quantity'));
+      const idxUnit = headers.findIndex(h => h.includes('satuan') || h.includes('unit'));
+      const idxPrice = headers.findIndex(h => h.includes('harga') || h.includes('price'));
+      const idxPayment = headers.findIndex(h => h.includes('pembayaran') || h.includes('payment') || h.includes('metode'));
+      const idxBranch = headers.findIndex(h => h.includes('cabang') || h.includes('branch'));
+      const idxVendor = headers.findIndex(h => h.includes('vendor') || h.includes('supplier'));
+
+      // Validate mandatory columns exist in headers
+      if (idxDate === -1 || idxCategory === -1 || idxDescription === -1 || idxQuantity === -1 || idxUnit === -1 || idxPrice === -1) {
+        setPreviewRows([]);
+        setPreviewSummary({ totalRows: 0, totalAmount: 0, hasErrors: true });
+        return;
+      }
+
+      const dataRows = rawRows.slice(1).filter(r => r.length > 0 && r.some(val => val !== undefined && val !== null && String(val).trim() !== ''));
+
+      let totalAmount = 0;
+      let hasErrors = false;
+
+      const parsedRows = dataRows.map((row: any[], index: number) => {
+        const rowNum = index + 2;
+        const dateRaw = idxDate !== -1 ? String(row[idxDate] || '').trim() : '';
+        const categoryRaw = idxCategory !== -1 ? String(row[idxCategory] || '').trim() : '';
+        const subCategoryRaw = idxSubCategory !== -1 ? String(row[idxSubCategory] || '').trim() : '';
+        const descriptionRaw = idxDescription !== -1 ? String(row[idxDescription] || '').trim() : '';
+        
+        const qtyRaw = idxQuantity !== -1 ? String(row[idxQuantity] || '').trim().replace(/[^0-9\.]/g, '') : '';
+        const priceRaw = idxPrice !== -1 ? String(row[idxPrice] || '').trim().replace(/[^0-9\.]/g, '') : '';
+        
+        const quantity = qtyRaw ? Number(qtyRaw) : 1;
+        const pricePerUnit = priceRaw ? Number(priceRaw) : 0;
+        const subtotal = quantity * pricePerUnit;
+
+        if (!isNaN(subtotal)) {
+          totalAmount += subtotal;
+        }
+
+        const unitRaw = idxUnit !== -1 ? String(row[idxUnit] || '').trim() : 'Unit';
+        const paymentRaw = idxPayment !== -1 ? String(row[idxPayment] || '').trim().toUpperCase() : 'CASH';
+        const branchRaw = idxBranch !== -1 ? String(row[idxBranch] || '').trim() : '';
+        const vendorRaw = idxVendor !== -1 ? String(row[idxVendor] || '').trim() : '';
+
+        // Validation rules
+        const errors: string[] = [];
+        if (!dateRaw) errors.push('Tanggal tidak boleh kosong');
+        if (!descriptionRaw) errors.push('Deskripsi tidak boleh kosong');
+        if (isNaN(quantity) || quantity <= 0) errors.push('Kuantitas harus positif');
+        if (isNaN(pricePerUnit) || pricePerUnit < 0) errors.push('Harga satuan harus positif');
+
+        if (errors.length > 0) {
+          hasErrors = true;
+        }
+
+        return {
+          rowNum,
+          date: dateRaw,
+          category: categoryRaw || 'Lain-lain',
+          subCategory: subCategoryRaw,
+          description: descriptionRaw,
+          quantity,
+          unit: unitRaw,
+          pricePerUnit,
+          subtotal,
+          paymentMethod: paymentRaw,
+          branch: branchRaw,
+          vendor: vendorRaw,
+          errors,
+        };
+      });
+
+      setPreviewRows(parsedRows);
+      setPreviewSummary({
+        totalRows: parsedRows.length,
+        totalAmount,
+        hasErrors,
+      });
+
+    } catch (err) {
+      console.error('Error generating preview:', err);
+      setPreviewRows([]);
+      setPreviewSummary({ totalRows: 0, totalAmount: 0, hasErrors: true });
+    }
+  };
+
   const processFile = (selectedFile: File) => {
     const isExcel = selectedFile.name.endsWith('.xlsx') || selectedFile.name.endsWith('.xls');
     const isCsv = selectedFile.name.endsWith('.csv');
@@ -52,6 +161,8 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       setGeneralError('Format file salah. Hanya file .csv, .xlsx, atau .xls yang diperbolehkan.');
       setFile(null);
       setCsvText('');
+      setPreviewRows([]);
+      setPreviewSummary(null);
       return;
     }
     
@@ -71,6 +182,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
             const worksheet = workbook.Sheets[sheetName];
             const csvContent = XLSX.utils.sheet_to_csv(worksheet);
             setCsvText(csvContent);
+            generatePreview(worksheet);
           }
         } catch (err) {
           console.error('Error parsing Excel file:', err);
@@ -81,7 +193,16 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
     } else {
       reader.onload = (e) => {
         if (e.target?.result) {
-          setCsvText(e.target.result as string);
+          const csvTextContent = e.target.result as string;
+          setCsvText(csvTextContent);
+          try {
+            const workbook = XLSX.read(csvTextContent, { type: 'string' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            generatePreview(worksheet);
+          } catch (err) {
+            console.error('Error preparing CSV preview:', err);
+          }
         }
       };
       reader.readAsText(selectedFile);
@@ -138,6 +259,8 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
     setCsvText('');
     setResult(null);
     setGeneralError(null);
+    setPreviewRows([]);
+    setPreviewSummary(null);
   };
 
   const handleDownloadTemplate = () => {
@@ -355,28 +478,152 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
           )
         ) : file ? (
           /* File Selected View (Ready to submit) */
-          <div className={styles.fileFrame}>
-            <div className={styles.fileMetaBlock}>
-              <div className={styles.fileIconWrapper}>
-                <FileSpreadsheet size={32} />
+          <>
+            <div className={styles.fileFrame}>
+              <div className={styles.fileMetaBlock}>
+                <div className={styles.fileIconWrapper}>
+                  <FileSpreadsheet size={32} />
+                </div>
+                <div>
+                  <h4 className={styles.fileName}>{file.name}</h4>
+                  <p className={styles.fileSize}>
+                    {(file.size / 1024).toFixed(1)} KB &bull; {file.name.endsWith('.csv') ? 'CSV File' : 'Excel Spreadsheet'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h4 className={styles.fileName}>{file.name}</h4>
-                <p className={styles.fileSize}>
-                  {(file.size / 1024).toFixed(1)} KB &bull; {file.name.endsWith('.csv') ? 'CSV File' : 'Excel Spreadsheet'}
-                </p>
+
+              <div className={styles.fileActions}>
+                <button type="button" className="btn btn-secondary" onClick={handleCancelFile} disabled={loading}>
+                  Ganti File
+                </button>
+                <button type="button" className="btn btn-primary" onClick={handleUpload} disabled={loading || previewSummary?.hasErrors}>
+                  Unggah Sekarang
+                </button>
               </div>
             </div>
 
-            <div className={styles.fileActions}>
-              <button type="button" className="btn btn-secondary" onClick={handleCancelFile} disabled={loading}>
-                Ganti File
-              </button>
-              <button type="button" className="btn btn-primary" onClick={handleUpload} disabled={loading}>
-                Unggah Sekarang
-              </button>
-            </div>
-          </div>
+            {/* Interactive Client Preview Panel */}
+            {previewSummary && (
+              <div className={styles.previewWrapper}>
+                <header className={styles.previewHeader}>
+                  <h4 className={styles.previewTitle}>Pratinjau Data Transaksi</h4>
+                  <p className={styles.previewSub}>
+                    Silakan tinjau data transaksi di bawah sebelum mengonfirmasi pengunggahan ke database.
+                  </p>
+                </header>
+
+                {/* Summary Cards Grid */}
+                <div className={styles.previewGrid}>
+                  <div className={styles.previewStatCard}>
+                    <span className={styles.previewStatLabel}>Total Transaksi</span>
+                    <span className={styles.previewStatValue}>{previewSummary.totalRows} Baris</span>
+                  </div>
+                  <div className={styles.previewStatCard}>
+                    <span className={styles.previewStatLabel}>Estimasi Total Biaya</span>
+                    <span className={styles.previewStatValue} style={{ color: 'var(--color-primary)' }}>
+                      {formatRupiah(previewSummary.totalAmount)}
+                    </span>
+                  </div>
+                  <div className={styles.previewStatCard}>
+                    <span className={styles.previewStatLabel}>Status Validasi</span>
+                    <span className={styles.previewStatValue}>
+                      {previewSummary.hasErrors ? (
+                        <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', fontSize: '10px' }}>
+                          <AlertCircle size={10} />
+                          Terdapat Error
+                        </span>
+                      ) : (
+                        <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', fontSize: '10px' }}>
+                          <CheckCircle size={10} />
+                          Format Sesuai
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                {previewSummary.hasErrors && (
+                  <div className={styles.errorBanner} style={{ margin: 0, padding: 'var(--space-3) var(--space-4)' }}>
+                    <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div style={{ fontSize: 'var(--text-xs)', lineHeight: 1.4 }}>
+                      <strong>Format File Bermasalah:</strong> Beberapa baris di bawah memiliki kesalahan format. Tombol unggah dinonaktifkan sementara. Perbaiki file template Anda dan unggah kembali.
+                    </div>
+                  </div>
+                )}
+
+                {/* Dynamic Preview Grid Table */}
+                {previewRows.length > 0 ? (
+                  <div>
+                    <div className={styles.previewTableScroll}>
+                      <table className={styles.previewTable}>
+                        <thead>
+                          <tr>
+                            <th>Baris</th>
+                            <th>Tanggal</th>
+                            <th>Kategori</th>
+                            <th>Deskripsi Kebutuhan</th>
+                            <th>Qty & Satuan</th>
+                            <th>Harga Satuan</th>
+                            <th>Subtotal</th>
+                            <th>Pembayaran</th>
+                            <th>Vendor Mapped</th>
+                            <th>Keterangan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {/* Limit view to first 10 rows as per user feedback */}
+                          {previewRows.slice(0, 10).map((row, idx) => {
+                            const isRowInvalid = row.errors.length > 0;
+                            return (
+                              <tr key={idx} className={isRowInvalid ? styles.errorRow : ''}>
+                                <td style={{ fontWeight: 600, color: 'var(--color-text-muted)' }}>#{row.rowNum}</td>
+                                <td className={!row.date ? styles.errorCell : ''} title={row.errors.find((e: string) => e.includes('Tanggal')) || ''}>
+                                  {row.date || '-'}
+                                </td>
+                                <td>{row.category} {row.subCategory ? `(${row.subCategory})` : ''}</td>
+                                <td className={!row.description ? styles.errorCell : ''} title={row.errors.find((e: string) => e.includes('Deskripsi')) || ''}>
+                                  {row.description || '-'}
+                                </td>
+                                <td className={row.errors.some((e: string) => e.includes('Kuantitas')) ? styles.errorCell : ''}>
+                                  {row.quantity} {row.unit}
+                                </td>
+                                <td className={row.errors.some((e: string) => e.includes('Harga')) ? styles.errorCell : ''}>
+                                  {formatRupiah(row.pricePerUnit)}
+                                </td>
+                                <td style={{ fontWeight: 600 }}>{formatRupiah(row.subtotal)}</td>
+                                <td>{formatPaymentMethod(row.paymentMethod)}</td>
+                                <td>{row.vendor || '-'}</td>
+                                <td>
+                                  {isRowInvalid ? (
+                                    <span style={{ color: 'var(--color-danger)', fontWeight: 600, fontSize: '10px' }} title={row.errors.join(', ')}>
+                                      ⚠️ {row.errors[0]}
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: 'var(--color-success)', fontSize: '10px', fontWeight: 600 }}>Siap</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {previewRows.length > 10 && (
+                      <p className={styles.footnote}>
+                        * Menampilkan 10 dari <strong>{previewRows.length}</strong> total baris transaksi terdeteksi.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: 'var(--space-4)', border: '1.5px dashed var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-light)' }}>
+                      Kolom template tidak lengkap atau tidak dapat dibaca. Pastikan header sesuai spesifikasi.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         ) : (
           /* Drag & Drop Zone Initial View */
           <div
