@@ -29,10 +29,10 @@ interface BottomNavItem {
 }
 
 const ITEMS: BottomNavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['SUPERADMIN', 'DATA_ENTRY', 'VIEWER'] },
-  { label: 'Input', href: '/transaksi/input', icon: PlusCircle, roles: ['SUPERADMIN', 'DATA_ENTRY'] },
-  { label: 'Riwayat', href: '/transaksi/riwayat', icon: ClipboardList, roles: ['SUPERADMIN', 'DATA_ENTRY'] },
-  { label: 'Laporan', href: '/laporan', icon: BarChart3, roles: ['SUPERADMIN', 'DATA_ENTRY', 'VIEWER'] },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY', 'VIEWER'] },
+  { label: 'Input', href: '/transaksi/input', icon: PlusCircle, roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY'] },
+  { label: 'Riwayat', href: '/transaksi/riwayat', icon: ClipboardList, roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY'] },
+  { label: 'Laporan', href: '/laporan', icon: BarChart3, roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY', 'VIEWER'] },
 ];
 
 export default function BottomNav({ user }: BottomNavProps) {

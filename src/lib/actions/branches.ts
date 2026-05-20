@@ -173,7 +173,12 @@ export async function updateBranch(
 
     const { name, code, address, isActive } = data;
 
-    const updateData: any = {};
+    const updateData: {
+      name?: string;
+      code?: string;
+      address?: string | null;
+      isActive?: boolean;
+    } = {};
 
     if (name !== undefined) {
       if (name.trim() === '') {
@@ -250,6 +255,77 @@ export async function updateBranch(
     return {
       success: false,
       error: 'Terjadi kesalahan sistem saat memperbarui data cabang.',
+    };
+  }
+}
+
+/**
+ * Server Action to delete a branch site (Superadmin Only).
+ * Strictly checks for dependent users, transactions, and ongoing payments before deleting.
+ */
+export async function deleteBranch(id: number): Promise<ApiResponse<{ success: boolean }>> {
+  try {
+    const actor = await getCurrentUser();
+    if (!actor || actor.role !== 'SUPERADMIN') {
+      return {
+        success: false,
+        error: 'Akses Ditolak: Hanya SUPERADMIN yang diizinkan menghapus cabang.',
+      };
+    }
+
+    // 1. Check for dependent users
+    const userCount = await prisma.user.count({
+      where: { branchId: id },
+    });
+    if (userCount > 0) {
+      return {
+        success: false,
+        error: `Tidak dapat menghapus cabang ini karena masih terdapat ${userCount} akun operator GA yang terdaftar di cabang ini. Pindahkan atau hapus operator terlebih dahulu.`,
+      };
+    }
+
+    // 2. Check for dependent transactions
+    const txCount = await prisma.transaction.count({
+      where: { branchId: id },
+    });
+    if (txCount > 0) {
+      return {
+        success: false,
+        error: `Tidak dapat menghapus cabang ini karena terdapat ${txCount} catatan transaksi keuangan terkait. Silakan gunakan opsi 'Non-Aktifkan' untuk mengarsipkan cabang ini secara aman.`,
+      };
+    }
+
+    // 3. Check for dependent ongoing payments
+    const ongoingCount = await prisma.ongoingPayment.count({
+      where: { branchId: id },
+    });
+    if (ongoingCount > 0) {
+      return {
+        success: false,
+        error: `Tidak dapat menghapus cabang ini karena terdapat ${ongoingCount} pengeluaran berjalan (ongoing payments) terkait. Selesaikan atau hapus pengeluaran berjalan terlebih dahulu.`,
+      };
+    }
+
+    // 4. All checks passed, perform deletion
+    await prisma.branch.delete({
+      where: { id },
+    });
+
+    revalidatePath('/admin/branches');
+    revalidatePath('/admin/users');
+    revalidatePath('/transaksi/ongoing');
+    revalidatePath('/transaksi/riwayat');
+    revalidatePath('/laporan');
+
+    return {
+      success: true,
+      data: { success: true },
+    };
+  } catch (error) {
+    console.error('Error in deleteBranch action:', error);
+    return {
+      success: false,
+      error: 'Terjadi kesalahan sistem saat menghapus data cabang.',
     };
   }
 }

@@ -5,12 +5,15 @@ import { getCurrentUser } from '@/lib/actions/auth';
 import type { ApiResponse } from '@/types';
 import type { TransactionWithRelations } from '@/lib/actions/transactions';
 import { Prisma } from '@prisma/client';
+import type { OngoingPaymentWithRelations } from './ongoing';
 
 export interface DashboardStats {
   monthlyExpense: number;
   monthlyCount: number;
   pettyCashExpense: number;
   recentTransactions: TransactionWithRelations[];
+  activeOngoingPayments: OngoingPaymentWithRelations[];
+  activePanjarExpense: number;
 }
 
 /**
@@ -62,7 +65,7 @@ export async function getDashboardStats(selectedBranchId?: number): Promise<ApiR
     }
 
     // Execute queries in parallel using Promise.all to maximize database performance
-    const [monthlySum, monthlyCount, pettyCashSum, recent] = await Promise.all([
+    const [monthlySum, monthlyCount, pettyCashSum, recent, activePayments, activePaymentsSum] = await Promise.all([
       // 1. Sum total amount for current month
       prisma.transaction.aggregate({
         where: baseWhere,
@@ -107,6 +110,47 @@ export async function getDashboardStats(selectedBranchId?: number): Promise<ApiR
         ],
         take: 5,
       }),
+
+      // 5. Fetch active ongoing payments (BELUM_DIBAYAR or SUDAH_DIBAYAR)
+      (user.role === 'SUPERADMIN' || user.role === 'ADMIN')
+        ? prisma.ongoingPayment.findMany({
+            where: {
+              status: { in: ['BELUM_DIBAYAR', 'SUDAH_DIBAYAR'] },
+              ...(branchIdFilter !== undefined ? { branchId: branchIdFilter } : {}),
+            },
+            include: {
+              branch: true,
+              category: true,
+              user: {
+                select: {
+                  fullName: true,
+                  username: true,
+                },
+              },
+              transaction: {
+                select: {
+                  id: true,
+                  beritaAcara: true,
+                },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          })
+        : Promise.resolve([]),
+
+      // 6. Sum outstanding panjar cash advances (SUDAH_DIBAYAR)
+      (user.role === 'SUPERADMIN' || user.role === 'ADMIN')
+        ? prisma.ongoingPayment.aggregate({
+            where: {
+              status: 'SUDAH_DIBAYAR',
+              ...(branchIdFilter !== undefined ? { branchId: branchIdFilter } : {}),
+            },
+            _sum: {
+              amountNeeded: true,
+            },
+          })
+        : Promise.resolve({ _sum: { amountNeeded: null } }),
     ]);
 
     // Format Prisma Decimal sums to standard javascript numbers (Poka-Yoke: default nulls to 0)
@@ -120,6 +164,15 @@ export async function getDashboardStats(selectedBranchId?: number): Promise<ApiR
       totalAmount: Number(t.totalAmount),
     }));
 
+    const serializedActivePayments: OngoingPaymentWithRelations[] = activePayments.map((p) => ({
+      ...p,
+      amountNeeded: Number(p.amountNeeded),
+      actualAmount: p.actualAmount ? Number(p.actualAmount) : null,
+    }));
+
+    const panjarSum = activePaymentsSum as { _sum: { amountNeeded: Prisma.Decimal | null } };
+    const activePanjarExpenseValue = Number(panjarSum._sum.amountNeeded || 0);
+
     return {
       success: true,
       data: {
@@ -127,6 +180,8 @@ export async function getDashboardStats(selectedBranchId?: number): Promise<ApiR
         monthlyCount,
         pettyCashExpense: pettyCashExpenseValue,
         recentTransactions: serializedRecent,
+        activeOngoingPayments: serializedActivePayments,
+        activePanjarExpense: activePanjarExpenseValue,
       },
     };
   } catch (error) {

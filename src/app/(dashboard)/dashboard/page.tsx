@@ -24,6 +24,8 @@ export default async function DashboardPage() {
         monthlyCount: 0,
         pettyCashExpense: 0,
         recentTransactions: [],
+        activeOngoingPayments: [],
+        activePanjarExpense: 0,
       };
 
   return (

@@ -44,7 +44,7 @@ export default function UserListingClient({ branches }: UserListingClientProps) 
   // Form states - Add User
   const [newUsername, setNewUsername] = useState<string>('');
   const [newFullName, setNewFullName] = useState<string>('');
-  const [newRole, setNewRole] = useState<'SUPERADMIN' | 'DATA_ENTRY' | 'VIEWER'>('DATA_ENTRY');
+  const [newRole, setNewRole] = useState<'SUPERADMIN' | 'ADMIN' | 'DATA_ENTRY' | 'VIEWER'>('DATA_ENTRY');
   const [newBranchId, setNewBranchId] = useState<string>('');
   const [newPassword, setNewPassword] = useState<string>('');
   const [addError, setAddError] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export default function UserListingClient({ branches }: UserListingClientProps) 
 
   // Form states - Edit User
   const [editFullName, setEditFullName] = useState<string>('');
-  const [editRole, setEditRole] = useState<'SUPERADMIN' | 'DATA_ENTRY' | 'VIEWER'>('DATA_ENTRY');
+  const [editRole, setEditRole] = useState<'SUPERADMIN' | 'ADMIN' | 'DATA_ENTRY' | 'VIEWER'>('DATA_ENTRY');
   const [editBranchId, setEditBranchId] = useState<string>('');
   const [editError, setEditError] = useState<string | null>(null);
   const [editLoading, setEditLoading] = useState<boolean>(false);
@@ -262,6 +262,7 @@ export default function UserListingClient({ branches }: UserListingClientProps) 
           >
             <option value="">Semua Peran</option>
             <option value="SUPERADMIN">Superadmin</option>
+            <option value="ADMIN">Admin Cabang</option>
             <option value="DATA_ENTRY">Data Entry</option>
             <option value="VIEWER">Viewer</option>
           </select>
@@ -325,6 +326,7 @@ export default function UserListingClient({ branches }: UserListingClientProps) 
                     <td>
                       <span className={`${styles.badge} ${
                         u.role === 'SUPERADMIN' ? styles.badgeSuperadmin :
+                        u.role === 'ADMIN' ? styles.badgeAdmin :
                         u.role === 'DATA_ENTRY' ? styles.badgeDataEntry :
                         styles.badgeViewer
                       }`}>
@@ -451,6 +453,7 @@ export default function UserListingClient({ branches }: UserListingClientProps) 
                   onChange={(e) => setNewRole(e.target.value as any)}
                 >
                   <option value="DATA_ENTRY">Data Entry (Hanya Cabang Mapped)</option>
+                  <option value="ADMIN">Admin (Mengelola Cabang & Ongoing)</option>
                   <option value="VIEWER">Viewer (Membaca Data Cabang Mapped)</option>
                   <option value="SUPERADMIN">Superadmin (Global / Semua Cabang)</option>
                 </select>
@@ -536,6 +539,7 @@ export default function UserListingClient({ branches }: UserListingClientProps) 
                   onChange={(e) => setEditRole(e.target.value as any)}
                 >
                   <option value="DATA_ENTRY">Data Entry</option>
+                  <option value="ADMIN">Admin</option>
                   <option value="VIEWER">Viewer</option>
                   <option value="SUPERADMIN">Superadmin</option>
                 </select>

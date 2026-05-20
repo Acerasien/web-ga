@@ -155,7 +155,7 @@ export async function createTransaction(
           },
         });
         break; // Success! Exit retry loop
-      } catch (error: any) {
+      } catch (error) {
         // Catch PostgreSQL unique constraint violation (P2002)
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
           retryCount++;
@@ -411,7 +411,11 @@ export async function deleteTransaction(id: number): Promise<ApiResponse<{ succe
       };
     }
 
-    // Delete transaction cleanly from Prisma
+    // Delete transaction cleanly from Prisma, including its corresponding ongoing payment request
+    await prisma.ongoingPayment.deleteMany({
+      where: { transactionId: id },
+    });
+
     await prisma.transaction.delete({
       where: { id },
     });
@@ -419,6 +423,7 @@ export async function deleteTransaction(id: number): Promise<ApiResponse<{ succe
     // Clear router cache tags to trigger live layout refreshes
     revalidatePath('/dashboard');
     revalidatePath('/transaksi/riwayat');
+    revalidatePath('/transaksi/ongoing');
 
     return {
       success: true,
@@ -433,3 +438,69 @@ export async function deleteTransaction(id: number): Promise<ApiResponse<{ succe
     };
   }
 }
+
+/**
+ * Server Action to fetch a single transaction with all its relations for detail view.
+ */
+export async function getTransactionById(
+  id: number
+): Promise<ApiResponse<TransactionWithRelations>> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: 'Sesi Anda telah berakhir. Silakan masuk kembali.',
+      };
+    }
+
+    const transaction = await prisma.transaction.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        subCategory: true,
+        branch: true,
+        user: {
+          select: {
+            fullName: true,
+            username: true,
+          },
+        },
+      },
+    });
+
+    if (!transaction) {
+      return {
+        success: false,
+        error: 'Transaksi tidak ditemukan.',
+      };
+    }
+
+    // Role boundary locking check: ADMIN/DATA_ENTRY/VIEWER are locked to their branch
+    if (user.role !== 'SUPERADMIN' && transaction.branchId !== user.branchId) {
+      return {
+        success: false,
+        error: 'Akses ditolak. Anda tidak memiliki izin untuk melihat transaksi cabang lain.',
+      };
+    }
+
+    const serializedTransaction: TransactionWithRelations = {
+      ...transaction,
+      quantity: Number(transaction.quantity),
+      pricePerUnit: Number(transaction.pricePerUnit),
+      totalAmount: Number(transaction.totalAmount),
+    };
+
+    return {
+      success: true,
+      data: serializedTransaction,
+    };
+  } catch (error) {
+    console.error('Error inside getTransactionById Server Action:', error);
+    return {
+      success: false,
+      error: 'Terjadi kesalahan sistem saat memuat detail transaksi.',
+    };
+  }
+}
+

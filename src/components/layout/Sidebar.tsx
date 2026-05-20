@@ -15,16 +15,18 @@ import {
   ChevronRight,
   Upload,
   LogOut,
+  Clock,
 } from 'lucide-react';
 import type { AuthUser, NavItem } from '@/types';
 import styles from './Sidebar.module.css';
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard', roles: ['SUPERADMIN', 'DATA_ENTRY', 'VIEWER'] },
-  { label: 'Input Transaksi', href: '/transaksi/input', icon: 'PlusCircle', roles: ['SUPERADMIN', 'DATA_ENTRY'] },
-  { label: 'Riwayat', href: '/transaksi/riwayat', icon: 'ClipboardList', roles: ['SUPERADMIN', 'DATA_ENTRY'] },
-  { label: 'Import Data', href: '/transaksi/import', icon: 'Upload', roles: ['SUPERADMIN', 'DATA_ENTRY'] },
-  { label: 'Laporan', href: '/laporan', icon: 'BarChart3', roles: ['SUPERADMIN', 'DATA_ENTRY', 'VIEWER'] },
+  { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY', 'VIEWER'] },
+  { label: 'Input Transaksi', href: '/transaksi/input', icon: 'PlusCircle', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY'] },
+  { label: 'Riwayat', href: '/transaksi/riwayat', icon: 'ClipboardList', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY'] },
+  { label: 'Ongoing Payment', href: '/transaksi/ongoing', icon: 'Clock', roles: ['SUPERADMIN', 'ADMIN'] },
+  { label: 'Import Data', href: '/transaksi/import', icon: 'Upload', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY'] },
+  { label: 'Laporan', href: '/laporan', icon: 'BarChart3', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY', 'VIEWER'] },
   { label: 'Pengguna', href: '/admin/users', icon: 'Users', roles: ['SUPERADMIN'] },
   { label: 'Cabang', href: '/admin/branches', icon: 'Building2', roles: ['SUPERADMIN'] },
   { label: 'Kategori', href: '/admin/kategori', icon: 'Settings', roles: ['SUPERADMIN'] },
@@ -39,6 +41,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Building2,
   Settings,
   Upload,
+  Clock,
 };
 
 interface SidebarProps {

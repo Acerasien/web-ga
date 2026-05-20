@@ -15,6 +15,7 @@ datasource db {
 
 enum UserRole {
   SUPERADMIN
+  ADMIN
   DATA_ENTRY
   VIEWER
 }
@@ -42,6 +43,7 @@ model Branch {
   // Relations
   users        User[]
   transactions Transaction[]
+  ongoingPayments OngoingPayment[]
 
   @@map("branches")
 }
@@ -61,6 +63,7 @@ model User {
   // Relations
   branch       Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
   transactions Transaction[]
+  ongoingPayments OngoingPayment[]
 
   @@map("users")
 }
@@ -80,6 +83,7 @@ model Category {
   // Relations
   subCategories SubCategory[]
   transactions  Transaction[]
+  ongoingPayments OngoingPayment[]
 
   @@map("categories")
 }
@@ -125,6 +129,7 @@ model Transaction {
   user        User         @relation(fields: [userId], references: [id], onDelete: Restrict)
   category    Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   subCategory SubCategory? @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  ongoingPayment OngoingPayment?
 
   // Indexes for performance (per database-design skill)
   @@index([branchId, transactionDate(sort: Desc)], name: "idx_tx_branch_date")
@@ -134,4 +139,35 @@ model Transaction {
   @@index([paymentMethod], name: "idx_tx_payment")
 
   @@map("transactions")
+}
+
+/// Ongoing Payments (Pembayaran Berjalan)
+model OngoingPayment {
+  id                 Int            @id @default(autoincrement())
+  branchId           Int            @map("branch_id")
+  categoryId         Int            @map("category_id")
+  userId             Int            @map("user_id")
+  description        String         @db.VarChar(255)
+  amountNeeded       Decimal        @map("amount_needed") @db.Decimal(15, 2)
+  initialReceiptPath String?        @map("initial_receipt_path") @db.VarChar(500)
+  finalReceiptPath   String?        @map("final_receipt_path") @db.VarChar(500)
+  status             String         @default("BELUM_DIBAYAR") @db.VarChar(20) // BELUM_DIBAYAR, SUDAH_DIBAYAR, TER_REALISASI
+  isMoneyEnough      Boolean?       @map("is_money_enough")
+  actualAmount       Decimal?       @map("actual_amount") @db.Decimal(15, 2)
+  transactionId      Int?           @unique @map("transaction_id")
+  requestDate        DateTime       @default(now()) @map("request_date") @db.Date
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+
+  // Relations
+  branch             Branch         @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  category           Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  user               User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  transaction        Transaction?   @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  // Optimization indexes
+  @@index([branchId, status])
+  @@index([createdAt(sort: Desc)])
+  @@map("ongoing_payments")
 }

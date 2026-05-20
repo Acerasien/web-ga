@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Building, 
   Plus, 
@@ -10,13 +10,15 @@ import {
   Receipt, 
   Wallet, 
   AlertCircle,
-  Search
+  Search,
+  Trash2
 } from 'lucide-react';
-import { getAdminBranches, createBranch, updateBranch } from '@/lib/actions/branches';
+import { getAdminBranches, createBranch, updateBranch, deleteBranch } from '@/lib/actions/branches';
 import type { BranchAdminPayload } from '@/lib/actions/branches';
 import { formatRupiah } from '@/lib/formatters';
 import styles from '@/app/(dashboard)/admin/admin.module.css';
 import modalStyles from '@/components/modals/modal.module.css';
+import ConfirmModal from '@/components/modals/ConfirmModal';
 
 export default function BranchListingClient() {
   const [branches, setBranches] = useState<BranchAdminPayload[]>([]);
@@ -43,8 +45,12 @@ export default function BranchListingClient() {
   const [editError, setEditError] = useState<string | null>(null);
   const [editLoading, setEditLoading] = useState<boolean>(false);
 
+  // Deletion states
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
+  const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
+
   // 1. Fetch branches details
-  const loadBranches = async () => {
+  const loadBranches = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -60,11 +66,12 @@ export default function BranchListingClient() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadBranches();
-  }, []);
+  }, [loadBranches]);
 
   // 2. Add Branch submit handler
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -130,6 +137,35 @@ export default function BranchListingClient() {
       setEditError('Koneksi terputus. Silakan coba kembali.');
     } finally {
       setEditLoading(false);
+    }
+  };
+
+  // 4. Branch Delete handlers
+  const handleDeleteClick = () => {
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedBranch) return;
+    setEditError(null);
+    setDeleteLoading(true);
+
+    try {
+      const res = await deleteBranch(selectedBranch.id);
+      if (res.success) {
+        setDeleteConfirmOpen(false);
+        setEditOpen(false);
+        loadBranches();
+      } else {
+        setEditError(res.error || 'Gagal menghapus cabang.');
+        setDeleteConfirmOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setEditError('Koneksi terputus. Gagal melakukan penghapusan.');
+      setDeleteConfirmOpen(false);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -401,16 +437,41 @@ export default function BranchListingClient() {
                 </label>
               </div>
 
-              <footer style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setEditOpen(false)}>Batalkan</button>
-                <button type="submit" className="btn btn-primary" disabled={editLoading}>
-                  {editLoading ? 'Menyimpan...' : 'Simpan Detail'}
+              <footer style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-4)', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--color-border)' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-danger" 
+                  onClick={handleDeleteClick}
+                  disabled={editLoading}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Trash2 size={14} />
+                  <span>Hapus Cabang</span>
                 </button>
+
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setEditOpen(false)}>Batalkan</button>
+                  <button type="submit" className="btn btn-primary" disabled={editLoading}>
+                    {editLoading ? 'Menyimpan...' : 'Simpan Detail'}
+                  </button>
+                </div>
               </footer>
             </form>
           </div>
         </div>
       )}
+
+      {/* Deletion Confirmation Dialog */}
+      <ConfirmModal
+        isOpen={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Hapus Kantor Cabang"
+        message={`Apakah Anda yakin ingin menghapus kantor cabang '${selectedBranch?.code}' (${selectedBranch?.name}) secara PERMANEN? Tindakan ini akan menghapusnya dari database dan tidak dapat dibatalkan.`}
+        confirmText="Ya, Hapus"
+        cancelText="Batal"
+        isPending={deleteLoading}
+      />
     </div>
   );
 }

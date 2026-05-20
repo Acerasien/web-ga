@@ -17,7 +17,7 @@ import { createTransaction } from '@/lib/actions/transactions';
 import { formatRupiah } from '@/lib/formatters';
 import type { AuthUser, TransactionFormData, FieldsConfig, CategoryField } from '@/types';
 import type { CategoryWithSub } from '@/lib/actions/categories';
-import type { Branch } from '@prisma/client';
+import type { Branch, PaymentMethod } from '@prisma/client';
 import styles from '@/app/(dashboard)/transaksi/input/input.module.css';
 import modalStyles from '@/components/modals/modal.module.css';
 
@@ -200,7 +200,7 @@ export default function TransactionForm({ user, categories, branches }: Transact
           quantity,
           unit: unit.trim(),
           pricePerUnit,
-          paymentMethod: paymentMethod as any,
+          paymentMethod: paymentMethod as PaymentMethod,
           vendor: vendor.trim() || undefined,
           receiptPath: receiptPath || undefined,
           notes: notes.trim() || undefined,

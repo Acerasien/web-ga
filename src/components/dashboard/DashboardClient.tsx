@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Wallet, Receipt, CreditCard, Activity, ArrowRight, PlusCircle, Search } from 'lucide-react';
+import { Wallet, Receipt, CreditCard, Activity, ArrowRight, PlusCircle, Search, Clock, CheckCircle2, Coins } from 'lucide-react';
 import Link from 'next/link';
 import { formatRupiah } from '@/lib/formatters';
 import type { DashboardStats } from '@/lib/actions/dashboard';
@@ -17,6 +17,7 @@ interface DashboardClientProps {
 
 export default function DashboardClient({ user, initialStats }: DashboardClientProps) {
   const router = useRouter();
+  const isAuthorized = user.role === 'SUPERADMIN' || user.role === 'ADMIN';
   // Modal states for interactive row previews
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithRelations | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
@@ -36,6 +37,18 @@ export default function DashboardClient({ user, initialStats }: DashboardClientP
       badgeText: 'Total MTD',
       badgeClass: 'badge-success',
     },
+    ...(isAuthorized
+      ? [
+          {
+            label: 'Kas Berjalan',
+            value: formatRupiah(initialStats.activePanjarExpense),
+            icon: Coins,
+            colorClass: 'warning',
+            badgeText: 'Panjar Belum Realisasi',
+            badgeClass: 'badge-warning',
+          },
+        ]
+      : []),
     {
       label: 'Jumlah Transaksi',
       value: String(initialStats.monthlyCount),
@@ -48,9 +61,9 @@ export default function DashboardClient({ user, initialStats }: DashboardClientP
       label: 'Metode Petty Cash',
       value: formatRupiah(initialStats.pettyCashExpense),
       icon: CreditCard,
-      colorClass: 'warning',
+      colorClass: 'info',
       badgeText: 'Kas Kecil Cabang',
-      badgeClass: 'badge-warning',
+      badgeClass: 'badge-info',
     },
   ];
 
@@ -111,15 +124,9 @@ export default function DashboardClient({ user, initialStats }: DashboardClientP
         })}
       </section>
 
-      {/* Main Activity Info Panel */}
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr',
-          gap: 'var(--space-6)',
-        }}
-      >
-        <div className="card" style={{ minWidth: 0, overflow: 'hidden' }}>
+      {/* Main Activity Info Panel & Active Checklist Feed */}
+      <section className={isAuthorized ? 'dashboard-grid' : ''} style={!isAuthorized ? { display: 'grid', gridTemplateColumns: '1fr', gap: 'var(--space-6)' } : undefined}>
+        <div className="card dashboard-main" style={{ minWidth: 0, overflow: 'hidden' }}>
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 className="card-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
               <Activity size={18} style={{ color: 'var(--color-primary)' }} />
@@ -209,6 +216,121 @@ export default function DashboardClient({ user, initialStats }: DashboardClientP
             </div>
           )}
         </div>
+
+        {isAuthorized && (
+          <aside className="card dashboard-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-1)', padding: 0 }}>
+              <h3 className="card-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <Clock size={18} style={{ color: 'var(--color-primary)' }} />
+                <span>Pekerjaan Berjalan</span>
+              </h3>
+              <span className="badge badge-info" style={{ fontWeight: 700 }}>
+                {initialStats.activeOngoingPayments.length} Aktif
+              </span>
+            </div>
+            
+            <p className="text-muted" style={{ fontSize: 'var(--text-xs)', margin: '0 0 var(--space-1) 0', lineHeight: 1.4 }}>
+              Daftar permintaan pembayaran berjalan yang memerlukan perhatian atau tindakan realisasi segera.
+            </p>
+
+            {initialStats.activeOngoingPayments.length === 0 ? (
+              <div className="checklist-empty-state" style={{ flex: 1 }}>
+                <CheckCircle2 size={32} style={{ color: 'var(--color-success)', marginBottom: 'var(--space-3)', opacity: 0.8 }} />
+                <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 var(--space-1) 0', color: 'var(--color-text)' }}>
+                  Semua Pekerjaan Beres!
+                </h4>
+                <p style={{ fontSize: 'var(--text-xs)', maxWidth: '280px', margin: 0, color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                  Tidak ada pengajuan pembayaran berjalan yang perlu tindakan saat ini. Kinerja operasional luar biasa!
+                </p>
+              </div>
+            ) : (
+              <div className="checklist-scrollable-container" style={{ maxHeight: '420px' }}>
+                {initialStats.activeOngoingPayments.map((p) => (
+                  <Link 
+                    key={p.id}
+                    href="/transaksi/ongoing"
+                    className="checklist-card"
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                        <span className="badge badge-primary" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                          {p.branch.name}
+                        </span>
+                        <span className="badge" style={{ 
+                          fontSize: '10px', 
+                          padding: '2px 6px',
+                          backgroundColor: 'rgba(96, 165, 250, 0.1)', 
+                          color: '#2563EB',
+                          fontWeight: 600
+                        }}>
+                          {p.category.name}
+                        </span>
+                      </div>
+                      
+                      {p.status === 'BELUM_DIBAYAR' ? (
+                        <span className="badge" style={{ 
+                          fontSize: '10px', 
+                          padding: '2px 6px',
+                          backgroundColor: 'rgba(245, 158, 11, 0.1)', 
+                          color: '#D97706', 
+                          border: '1px solid rgba(245, 158, 11, 0.2)',
+                          fontWeight: 700 
+                        }}>
+                          Belum Dibayar
+                        </span>
+                      ) : (
+                        <span className="badge" style={{ 
+                          fontSize: '10px', 
+                          padding: '2px 6px',
+                          backgroundColor: 'rgba(59, 130, 246, 0.1)', 
+                          color: 'var(--color-primary-hover)', 
+                          border: '1px solid rgba(59, 130, 246, 0.2)',
+                          fontWeight: 700 
+                        }}>
+                          Sudah Dibayar
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-1)' }}>
+                      <div style={{ flex: 1, minWidth: 0, paddingRight: 'var(--space-2)' }}>
+                        <p style={{ 
+                          fontWeight: 600, 
+                          fontSize: 'var(--text-xs)', 
+                          margin: 0, 
+                          color: 'var(--color-text)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {p.description}
+                        </p>
+                        <p style={{ 
+                          fontSize: '10px', 
+                          color: 'var(--color-text-muted)', 
+                          margin: '2px 0 0 0' 
+                        }}>
+                          Oleh {p.user.fullName} &bull; {new Date(p.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                        </p>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                        <span style={{ 
+                          fontWeight: 700, 
+                          fontSize: 'var(--text-xs)', 
+                          color: 'var(--color-primary)' 
+                        }}>
+                          {formatRupiah(p.amountNeeded)}
+                        </span>
+                        <ArrowRight size={12} className="checklist-arrow" />
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </aside>
+        )}
       </section>
 
       {/* Rincian Detail Modal Overlay */}
