@@ -7,6 +7,14 @@ import type { TransactionFormData, ApiResponse } from '@/types';
 import { Prisma } from '@prisma/client';
 
 /**
+ * Helper to convert date month to Roman numeral
+ */
+function getRomanMonth(date: Date): string {
+  const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+  return roman[date.getMonth()];
+}
+
+/**
  * Server Action to record a new GA activity expense transaction.
  * Performs strict role validations and double-decimal math logic.
  */
@@ -79,26 +87,91 @@ export async function createTransaction(
     const price = new Prisma.Decimal(pricePerUnit);
     const totalAmount = qty.mul(price);
 
-    // Save transaction inside database
-    await prisma.transaction.create({
-      data: {
-        branchId: targetBranchId,
-        userId: user.id,
-        categoryId: Number(categoryId),
-        subCategoryId: subCategoryId ? Number(subCategoryId) : null,
-        transactionDate: new Date(transactionDate),
-        description: description.trim(),
-        quantity: qty,
-        unit: unit.trim(),
-        pricePerUnit: price,
-        totalAmount,
-        paymentMethod,
-        vendor: vendor?.trim() || null,
-        receiptPath: receiptPath || null,
-        notes: notes?.trim() || null,
-        customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,
-      },
+    // Save transaction inside database with automatic Berita Acara (BA) generation & concurrency retry
+    const txDate = new Date(transactionDate);
+    const currentYear = txDate.getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
+    const endOfYear = new Date(currentYear, 11, 31);
+
+    // Get the branch code dynamically
+    const branch = await prisma.branch.findUnique({
+      where: { id: targetBranchId },
+      select: { code: true },
     });
+    const branchCode = branch?.code || 'UNK';
+
+    let retryCount = 0;
+    const maxRetries = 3;
+    let beritaAcara = '';
+
+    while (retryCount < maxRetries) {
+      // Find the most recently created transaction for this branch and calendar year
+      const latestTx = await prisma.transaction.findFirst({
+        where: {
+          branchId: targetBranchId,
+          transactionDate: {
+            gte: startOfYear,
+            lte: endOfYear,
+          },
+          beritaAcara: { not: null },
+        },
+        orderBy: { id: 'desc' },
+        select: { beritaAcara: true },
+      });
+
+      let nextSerial = 1;
+      if (latestTx && latestTx.beritaAcara) {
+        // Expected format: {Serial}/BA-GA/{Branch}/{RomanMonth}/{Year}
+        const parts = latestTx.beritaAcara.split('/');
+        const latestSerial = parseInt(parts[0], 10);
+        if (!isNaN(latestSerial)) {
+          nextSerial = latestSerial + 1;
+        }
+      }
+
+      const nextSerialStr = String(nextSerial).padStart(4, '0');
+      const romanMonth = getRomanMonth(txDate);
+      beritaAcara = `${nextSerialStr}/BA-GA/${branchCode}/${romanMonth}/${currentYear}`;
+
+      try {
+        await prisma.transaction.create({
+          data: {
+            branchId: targetBranchId,
+            userId: user.id,
+            categoryId: Number(categoryId),
+            subCategoryId: subCategoryId ? Number(subCategoryId) : null,
+            transactionDate: txDate,
+            description: description.trim(),
+            quantity: qty,
+            unit: unit.trim(),
+            pricePerUnit: price,
+            totalAmount,
+            paymentMethod,
+            vendor: vendor?.trim() || null,
+            receiptPath: receiptPath || null,
+            notes: notes?.trim() || null,
+            customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,
+            beritaAcara,
+          },
+        });
+        break; // Success! Exit retry loop
+      } catch (error: any) {
+        // Catch PostgreSQL unique constraint violation (P2002)
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          retryCount++;
+          if (retryCount >= maxRetries) {
+            return {
+              success: false,
+              error: 'Gagal membuat nomor Berita Acara yang unik karena kepadatan transaksi tinggi. Silakan coba lagi.',
+            };
+          }
+          // Delay briefly to allow the concurrent transaction to complete
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        } else {
+          throw error; // Rethrow other database/validation errors
+        }
+      }
+    }
 
     // Clear router cache tags to trigger live layout refreshes
     revalidatePath('/dashboard');
@@ -147,6 +220,7 @@ export interface TransactionWithRelations extends Omit<Transaction, 'quantity' |
     fullName: string;
     username: string;
   };
+  beritaAcara: string | null;
 }
 
 export interface PaginatedTransactions {
@@ -230,6 +304,7 @@ export async function getTransactions(
     if (search && search.trim() !== '') {
       const queryStr = search.trim();
       where.OR = [
+        { beritaAcara: { contains: queryStr, mode: 'insensitive' } },
         { description: { contains: queryStr, mode: 'insensitive' } },
         { vendor: { contains: queryStr, mode: 'insensitive' } },
         { notes: { contains: queryStr, mode: 'insensitive' } },

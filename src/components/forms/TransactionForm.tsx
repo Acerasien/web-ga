@@ -302,6 +302,20 @@ export default function TransactionForm({ user, categories, branches }: Transact
               </div>
             )}
 
+            {/* Nomor Berita Acara (Auto-generated Display) */}
+            <div className={styles.formGroup}>
+              <label htmlFor="beritaAcara" className={styles.label}>
+                Nomor Berita Acara
+              </label>
+              <input
+                id="beritaAcara"
+                type="text"
+                className={styles.input}
+                value="Otomatis dibuat saat disimpan"
+                disabled
+              />
+            </div>
+
             {/* Date Field */}
             <div className={styles.formGroup}>
               <label htmlFor="transactionDate" className={`${styles.label} ${styles.labelRequired}`}>

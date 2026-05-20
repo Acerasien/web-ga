@@ -116,6 +116,7 @@ model Transaction {
   receiptPath     String?       @map("receipt_path") @db.VarChar(500)
   notes           String?       @db.Text
   customFields    Json?         @map("custom_fields") @db.JsonB
+  beritaAcara     String?       @unique @map("berita_acara") @db.VarChar(50)
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 

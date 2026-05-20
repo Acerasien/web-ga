@@ -80,6 +80,14 @@ function parseCSVDate(dateStr: string): Date {
 }
 
 /**
+ * Helper to convert date month to Roman numeral
+ */
+function getRomanMonth(date: Date): string {
+  const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+  return roman[date.getMonth()];
+}
+
+/**
  * Server Action to securely bulk-import transactions from a parsed CSV string.
  * Runs atomically in a single Prisma transaction to avoid partial database corruption.
  */
@@ -151,6 +159,8 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
     const dataRows = rawLines.slice(1).filter(r => r.length > 1 && r.some(val => val.trim() !== ''));
     const importErrors: string[] = [];
     const transactionsToInsert: Prisma.TransactionCreateManyInput[] = [];
+    const branchCodeMap = new Map(dbBranches.map(b => [b.id, b.code]));
+    const serialTracker = new Map<string, number>();
 
     // Process and validate rows sequentially
     for (let i = 0; i < dataRows.length; i++) {
@@ -246,6 +256,45 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
         const vendor = idxVendor !== -1 ? row[idxVendor]?.trim() || null : null;
         const notes = idxNotes !== -1 ? row[idxNotes]?.trim() || null : null;
 
+        // Dynamic Berita Acara (BA) generation for import
+        const year = transactionDate.getFullYear();
+        const startOfYear = new Date(year, 0, 1);
+        const endOfYear = new Date(year, 11, 31);
+        const trackerKey = `${branchIdVal}_${year}`;
+
+        if (!serialTracker.has(trackerKey)) {
+          const latestTx = await prisma.transaction.findFirst({
+            where: {
+              branchId: branchIdVal,
+              transactionDate: {
+                gte: startOfYear,
+                lte: endOfYear,
+              },
+              beritaAcara: { not: null },
+            },
+            orderBy: { id: 'desc' },
+            select: { beritaAcara: true },
+          });
+
+          let highestSerial = 0;
+          if (latestTx && latestTx.beritaAcara) {
+            const parts = latestTx.beritaAcara.split('/');
+            const latestSerial = parseInt(parts[0], 10);
+            if (!isNaN(latestSerial)) {
+              highestSerial = latestSerial;
+            }
+          }
+          serialTracker.set(trackerKey, highestSerial);
+        }
+
+        const nextSerial = (serialTracker.get(trackerKey) || 0) + 1;
+        serialTracker.set(trackerKey, nextSerial);
+
+        const nextSerialStr = String(nextSerial).padStart(4, '0');
+        const branchCode = branchCodeMap.get(branchIdVal) || 'UNK';
+        const romanMonth = getRomanMonth(transactionDate);
+        const beritaAcara = `${nextSerialStr}/BA-GA/${branchCode}/${romanMonth}/${year}`;
+
         // Populate object into temporary buffer
         transactionsToInsert.push({
           transactionDate,
@@ -262,6 +311,7 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
           vendor,
           notes,
           customFields: Prisma.DbNull, // CSV imports do not map complex custom categories forms natively
+          beritaAcara,
         });
 
       } catch (err: any) {

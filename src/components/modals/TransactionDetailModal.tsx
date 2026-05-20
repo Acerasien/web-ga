@@ -124,6 +124,15 @@ export default function TransactionDetailModal({
             <div className={styles.grid}>
               <div className={styles.item}>
                 <span className={styles.label}>
+                  <FileText size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
+                  Nomor Berita Acara
+                </span>
+                <span className={styles.value} style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                  {transaction.beritaAcara || '-'}
+                </span>
+              </div>
+              <div className={styles.item}>
+                <span className={styles.label}>
                   <Calendar size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
                   Tanggal Transaksi
                 </span>
