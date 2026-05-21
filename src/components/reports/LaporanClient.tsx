@@ -490,7 +490,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
                   Tidak ada data tren untuk divisualisasikan.
                 </div>
               ) : mounted ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <LineChart data={report.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
                     <XAxis dataKey="label" stroke="#94A3B8" fontSize={11} tickLine={false} />
@@ -530,7 +530,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
                   Belum ada data proporsi.
                 </div>
               ) : mounted ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <RechartsPieChart>
                     <Pie
                       data={report.byCategory}
@@ -585,7 +585,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
                     Belum ada data cabang terekam.
                   </div>
                 ) : mounted ? (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <RechartsBarChart data={report.byBranch} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
                       <XAxis dataKey="code" stroke="#94A3B8" fontSize={11} tickLine={false} />

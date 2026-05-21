@@ -1,26 +1,82 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Wallet, Receipt, CreditCard, Activity, ArrowRight, PlusCircle, Search, Clock, CheckCircle2, Coins } from 'lucide-react';
+import { 
+  Wallet, 
+  Receipt, 
+  CreditCard, 
+  Activity, 
+  ArrowRight, 
+  PlusCircle, 
+  Search, 
+  Clock, 
+  CheckCircle2, 
+  Coins,
+  TrendingUp,
+  PieChart as PieIcon
+} from 'lucide-react';
+import { 
+  ResponsiveContainer, 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  PieChart as RechartsPieChart, 
+  Pie, 
+  Cell
+} from 'recharts';
 import Link from 'next/link';
 import { formatRupiah } from '@/lib/formatters';
 import type { DashboardStats } from '@/lib/actions/dashboard';
 import type { TransactionWithRelations } from '@/lib/actions/transactions';
+import type { ReportPayload, CategoryBreakdown } from '@/lib/actions/reports';
+import type { Branch } from '@prisma/client';
 import type { AuthUser } from '@/types';
 import TransactionDetailModal from '@/components/modals/TransactionDetailModal';
 
 interface DashboardClientProps {
   user: AuthUser;
   initialStats: DashboardStats;
+  initialChartData: ReportPayload;
+  branches: Branch[];
+  selectedBranchId?: number;
 }
 
-export default function DashboardClient({ user, initialStats }: DashboardClientProps) {
+// Harmonized professional chart colors
+const CHART_COLORS = [
+  '#3B82F6', // var(--color-primary)
+  '#10B981', // var(--color-success)
+  '#F97316', // var(--color-accent)
+  '#8B5CF6', // Purple
+  '#EC4899', // Pink
+  '#06B6D4', // Cyan
+  '#F59E0B', // Amber
+  '#CBD5E1'  // Slate fallbacks
+];
+
+export default function DashboardClient({ 
+  user, 
+  initialStats,
+  initialChartData,
+  branches,
+  selectedBranchId
+}: DashboardClientProps) {
   const router = useRouter();
   const isAuthorized = user.role === 'SUPERADMIN' || user.role === 'ADMIN';
+  
   // Modal states for interactive row previews
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithRelations | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
+
+  // Client hydration check to prevent Next.js SSR hydration shifts
+  const [mounted, setMounted] = useState<boolean>(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
   // Dynamic Indonesian Month Name for KPI Badges (Enterprise Premium Polish)
   const currentMonthLabel = new Date().toLocaleDateString('id-ID', {
@@ -85,16 +141,54 @@ export default function DashboardClient({ user, initialStats }: DashboardClientP
             <strong className="text-primary">{user.branchName || 'HQ (Semua Cabang)'}</strong>
           </p>
         </div>
-        {user.role !== 'VIEWER' && (
-          <Link 
-            href="/transaksi/input" 
-            className="btn btn-primary" 
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}
-          >
-            <PlusCircle size={18} />
-            <span>Catat Transaksi</span>
-          </Link>
-        )}
+        
+        {/* Dynamic Branch Dropdown Selector + Navigation Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+          {user.role === 'SUPERADMIN' && branches && branches.length > 0 && (
+            <select
+              value={selectedBranchId || ''}
+              onChange={(e) => {
+                const id = e.target.value;
+                router.push(id ? `/dashboard?branchId=${id}` : '/dashboard');
+              }}
+              style={{
+                padding: 'var(--space-2) var(--space-4)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 600,
+                color: 'var(--color-text)',
+                backgroundColor: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                minHeight: '44px',
+                width: '240px',
+                cursor: 'pointer',
+                outline: 'none',
+                boxShadow: 'var(--shadow-sm)',
+                transition: 'border-color var(--transition-fast)'
+              }}
+              className="form-select"
+            >
+              <option value="">Semua Cabang (HQ)</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {user.role !== 'VIEWER' && (
+            <Link 
+              href="/transaksi/input" 
+              className="btn btn-primary" 
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}
+            >
+              <PlusCircle size={18} />
+              <span>Catat Transaksi</span>
+            </Link>
+          )}
+        </div>
       </header>
 
       {/* Grid of KPI Stat Cards */}
@@ -333,6 +427,169 @@ export default function DashboardClient({ user, initialStats }: DashboardClientP
         )}
       </section>
 
+      {/* Dashboard Visual Charts Section (Priority 8 - Charts & Data) */}
+      {mounted && (
+        <section 
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr',
+            gap: 'var(--space-6)',
+            width: '100%'
+          }}
+        >
+          {initialChartData.totalSpending === 0 ? (
+            <div 
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                padding: 'var(--space-10) var(--space-6)',
+                border: '2px dashed var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--color-text-muted)'
+              }}
+            >
+              <TrendingUp size={36} style={{ marginBottom: 'var(--space-3)', opacity: 0.5, color: 'var(--color-primary)' }} />
+              <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 var(--space-1) 0', color: 'var(--color-text)' }}>
+                Belum Ada Pengeluaran Tercatat Bulan Ini
+              </h4>
+              <p style={{ fontSize: 'var(--text-xs)', maxWidth: '380px', margin: 0, color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                Belum ada transaksi operasional terdaftar untuk bulan ini. Grafik visualisasi akan muncul otomatis setelah transaksi pertama dicatat.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Top Row: Spending Trend & Category share */}
+              <div 
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                  gap: 'var(--space-6)',
+                  width: '100%'
+                }}
+              >
+                {/* Chart 1: Line Chart (Spending Trend) */}
+                <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ fontSize: 'var(--text-base)', display: 'inline-flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                      <TrendingUp size={16} style={{ color: 'var(--color-primary)' }} />
+                      <span>Tren Pengeluaran Bulan Ini</span>
+                    </h3>
+                    <Link href="/laporan" className="text-primary" style={{ fontSize: 'var(--text-xs)', fontWeight: 600, textDecoration: 'none' }}>
+                      Lihat Analisis Detail →
+                    </Link>
+                  </div>
+                  <div style={{ height: '220px', width: '100%', marginTop: 'var(--space-2)' }}>
+                    {mounted ? (
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                        <LineChart data={initialChartData.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                          <XAxis dataKey="label" stroke="#94A3B8" fontSize={10} tickLine={false} />
+                          <YAxis 
+                            stroke="#94A3B8" 
+                            fontSize={10} 
+                            tickLine={false} 
+                            tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}Jt` : val >= 1000 ? `${(val / 1000).toFixed(0)}rb` : val}
+                          />
+                          <Tooltip 
+                            formatter={(value) => [formatRupiah(Number(value)), 'Total Biaya']}
+                            contentStyle={{ background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '11px', boxShadow: 'var(--shadow-md)' }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="total" 
+                            stroke="var(--color-primary)" 
+                            strokeWidth={3} 
+                            dot={{ r: 3, stroke: 'var(--color-primary)', strokeWidth: 2, fill: '#FFF' }}
+                            activeDot={{ r: 5 }} 
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+                        Memuat data grafik...
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Chart 2: Donut Chart (Category Shares) */}
+                <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minWidth: 0 }}>
+                  <h3 style={{ fontSize: 'var(--text-base)', display: 'inline-flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                    <PieIcon size={16} style={{ color: 'var(--color-primary)' }} />
+                    <span>Proporsi Kategori Pengeluaran</span>
+                  </h3>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '140px', width: '100%', position: 'relative' }}>
+                    {mounted ? (
+                      <>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                          <RechartsPieChart>
+                            <Pie
+                              data={initialChartData.byCategory}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={40}
+                              outerRadius={55}
+                              paddingAngle={3}
+                              dataKey="total"
+                            >
+                              {initialChartData.byCategory.map((entry: CategoryBreakdown, index: number) => (
+                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value) => formatRupiah(Number(value))} contentStyle={{ fontSize: '11px', borderRadius: '8px' }} />
+                          </RechartsPieChart>
+                        </ResponsiveContainer>
+                        {/* Centered overall sum label */}
+                        <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total MTD</span>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text)' }}>
+                            {initialChartData.totalSpending >= 1000000 
+                              ? `${(initialChartData.totalSpending / 1000000).toFixed(1)} Jt` 
+                              : formatRupiah(initialChartData.totalSpending)}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+                        Memuat data grafik...
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dynamic scrollable custom legend list */}
+                  <div 
+                    style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', 
+                      gap: 'var(--space-2)',
+                      maxHeight: '65px', 
+                      overflowY: 'auto',
+                      paddingRight: '4px'
+                    }}
+                    className="checklist-scrollable-container"
+                  >
+                    {initialChartData.byCategory.slice(0, 6).map((cat: CategoryBreakdown, idx: number) => (
+                      <div key={cat.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '90px' }} title={cat.name}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: CHART_COLORS[idx % CHART_COLORS.length], flexShrink: 0 }} />
+                          <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>{cat.name}</span>
+                        </span>
+                        <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>{cat.percentage}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
       {/* Rincian Detail Modal Overlay */}
       <TransactionDetailModal
         isOpen={modalOpen}
@@ -349,3 +606,4 @@ export default function DashboardClient({ user, initialStats }: DashboardClientP
     </div>
   );
 }
+

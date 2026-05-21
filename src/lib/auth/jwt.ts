@@ -2,8 +2,12 @@ import { SignJWT, jwtVerify } from 'jose';
 import type { JWTPayload } from '@/types';
 
 // Encode JWT secret for HMAC SHA-256 signature
+const SECRET_KEY_STRING = process.env.JWT_SECRET;
+if (!SECRET_KEY_STRING && process.env.NODE_ENV === 'production') {
+  throw new Error('CRITICAL SECURITY ERROR: JWT_SECRET environment variable is missing in production!');
+}
 const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'web_ga_default_fallback_jwt_secret_key_change_in_production'
+  SECRET_KEY_STRING || 'web_ga_default_fallback_jwt_secret_key_change_in_production'
 );
 
 /**

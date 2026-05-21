@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join, extname } from 'path';
 import crypto from 'crypto';
+import { getCurrentUser } from '@/lib/actions/auth';
 
 // Configuration boundaries for uploader safety (Poka-Yoke)
 const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
@@ -13,6 +14,23 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 Megabytes in bytes
  */
 export async function POST(request: NextRequest) {
   try {
+    // 1. Authenticate user session
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Sesi Anda telah berakhir atau tidak valid. Silakan login kembali.' },
+        { status: 401 }
+      );
+    }
+
+    // 2. Authorize user role - VIEWER is not allowed to upload files
+    if (user.role === 'VIEWER') {
+      return NextResponse.json(
+        { success: false, error: 'Akses ditolak: Peran Anda tidak diizinkan untuk mengunggah berkas.' },
+        { status: 403 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
