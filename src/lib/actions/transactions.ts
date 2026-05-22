@@ -51,6 +51,7 @@ export async function createTransaction(
       receiptPath,
       notes,
       customFields,
+      beritaAcara,
     } = data;
 
     // Fail-fast on required primary field parameters
@@ -87,90 +88,55 @@ export async function createTransaction(
     const price = new Prisma.Decimal(pricePerUnit);
     const totalAmount = qty.mul(price);
 
-    // Save transaction inside database with automatic Berita Acara (BA) generation & concurrency retry
+    // Save transaction inside database with optional custom Berita Acara (BA)
     const txDate = new Date(transactionDate);
-    const currentYear = txDate.getFullYear();
-    const startOfYear = new Date(currentYear, 0, 1);
-    const endOfYear = new Date(currentYear, 11, 31);
 
-    // Get the branch code dynamically
-    const branch = await prisma.branch.findUnique({
-      where: { id: targetBranchId },
-      select: { code: true },
-    });
-    const branchCode = branch?.code || 'UNK';
-
-    let retryCount = 0;
-    const maxRetries = 3;
-    let beritaAcara = '';
-
-    while (retryCount < maxRetries) {
-      // Find the most recently created transaction for this branch and calendar year
-      const latestTx = await prisma.transaction.findFirst({
-        where: {
-          branchId: targetBranchId,
-          transactionDate: {
-            gte: startOfYear,
-            lte: endOfYear,
-          },
-          beritaAcara: { not: null },
-        },
-        orderBy: { id: 'desc' },
-        select: { beritaAcara: true },
+    let finalBeritaAcara: string | null = null;
+    if (beritaAcara && beritaAcara.trim() !== '') {
+      const trimmedBA = beritaAcara.trim();
+      
+      // Perform unique constraint check beforehand to give a clean error message
+      const existing = await prisma.transaction.findFirst({
+        where: { beritaAcara: trimmedBA },
+        select: { id: true },
       });
-
-      let nextSerial = 1;
-      if (latestTx && latestTx.beritaAcara) {
-        // Expected format: {Serial}/BA-GA/{Branch}/{RomanMonth}/{Year}
-        const parts = latestTx.beritaAcara.split('/');
-        const latestSerial = parseInt(parts[0], 10);
-        if (!isNaN(latestSerial)) {
-          nextSerial = latestSerial + 1;
-        }
+      
+      if (existing) {
+        return {
+          success: false,
+          error: 'Nomor Berita Acara tersebut sudah digunakan. Silakan gunakan nomor lain.',
+        };
       }
+      finalBeritaAcara = trimmedBA;
+    }
 
-      const nextSerialStr = String(nextSerial).padStart(4, '0');
-      const romanMonth = getRomanMonth(txDate);
-      beritaAcara = `${nextSerialStr}/BA-GA/${branchCode}/${romanMonth}/${currentYear}`;
-
-      try {
-        await prisma.transaction.create({
-          data: {
-            branchId: targetBranchId,
-            userId: user.id,
-            categoryId: Number(categoryId),
-            subCategoryId: subCategoryId ? Number(subCategoryId) : null,
-            transactionDate: txDate,
-            description: description.trim(),
-            quantity: qty,
-            unit: unit.trim(),
-            pricePerUnit: price,
-            totalAmount,
-            paymentMethod,
-            vendor: vendor?.trim() || null,
-            receiptPath: receiptPath || null,
-            notes: notes?.trim() || null,
-            customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,
-            beritaAcara,
-          },
-        });
-        break; // Success! Exit retry loop
-      } catch (error) {
-        // Catch PostgreSQL unique constraint violation (P2002)
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-          retryCount++;
-          if (retryCount >= maxRetries) {
-            return {
-              success: false,
-              error: 'Gagal membuat nomor Berita Acara yang unik karena kepadatan transaksi tinggi. Silakan coba lagi.',
-            };
-          }
-          // Delay briefly to allow the concurrent transaction to complete
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        } else {
-          throw error; // Rethrow other database/validation errors
-        }
-      }
+    try {
+      await prisma.transaction.create({
+        data: {
+          branchId: targetBranchId,
+          userId: user.id,
+          categoryId: Number(categoryId),
+          subCategoryId: subCategoryId ? Number(subCategoryId) : null,
+          transactionDate: txDate,
+          description: description.trim(),
+          quantity: qty,
+          unit: unit.trim(),
+          pricePerUnit: price,
+          totalAmount,
+          paymentMethod,
+          vendor: vendor?.trim() || null,
+          receiptPath: receiptPath || null,
+          notes: notes?.trim() || null,
+          customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,
+          beritaAcara: finalBeritaAcara,
+        },
+      });
+    } catch (error) {
+      console.error('Error during transaction create:', error);
+      return {
+        success: false,
+        error: 'Terjadi kesalahan sistem saat menyimpan transaksi.',
+      };
     }
 
     // Clear router cache tags to trigger live layout refreshes
@@ -423,7 +389,7 @@ export async function deleteTransaction(id: number): Promise<ApiResponse<{ succe
     // Clear router cache tags to trigger live layout refreshes
     revalidatePath('/dashboard');
     revalidatePath('/transaksi/riwayat');
-    revalidatePath('/transaksi/ongoing');
+    revalidatePath('/ongoing/list');
 
     return {
       success: true,

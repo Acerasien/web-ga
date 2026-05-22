@@ -50,6 +50,7 @@ export default function TransactionForm({ user, categories, branches }: Transact
   const [vendor, setVendor] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [branchId, setBranchId] = useState<string>('');
+  const [beritaAcara, setBeritaAcara] = useState<string>('');
 
   // Dynamic custom fields states
   const [customFields, setCustomFields] = useState<Record<string, string | number>>({});
@@ -205,6 +206,7 @@ export default function TransactionForm({ user, categories, branches }: Transact
           receiptPath: receiptPath || undefined,
           notes: notes.trim() || undefined,
           customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
+          beritaAcara: beritaAcara.trim() || undefined,
         };
 
         if (user.role === 'SUPERADMIN') {
@@ -238,6 +240,7 @@ export default function TransactionForm({ user, categories, branches }: Transact
     setNotes('');
     setCustomFields({});
     setSubCategoryId('');
+    setBeritaAcara('');
     handleRemoveReceipt();
   };
 
@@ -302,17 +305,19 @@ export default function TransactionForm({ user, categories, branches }: Transact
               </div>
             )}
 
-            {/* Nomor Berita Acara (Auto-generated Display) */}
+            {/* Nomor Berita Acara (Optional Input) */}
             <div className={styles.formGroup}>
               <label htmlFor="beritaAcara" className={styles.label}>
-                Nomor Berita Acara
+                Nomor Berita Acara (Opsional)
               </label>
               <input
                 id="beritaAcara"
                 type="text"
                 className={styles.input}
-                value="Otomatis dibuat saat disimpan"
-                disabled
+                placeholder="Contoh: 0001/BA-GA/HO/V/2026"
+                value={beritaAcara}
+                onChange={(e) => setBeritaAcara(e.target.value)}
+                disabled={isPending}
               />
             </div>
 
@@ -792,6 +797,13 @@ export default function TransactionForm({ user, categories, branches }: Transact
                   <span className={modalStyles.label}>Harga Satuan</span>
                   <span className={modalStyles.value}>
                     {formatRupiah(pricePerUnit)}
+                  </span>
+                </div>
+
+                <div className={modalStyles.item} style={{ gridColumn: 'span 2' }}>
+                  <span className={modalStyles.label}>Nomor Berita Acara</span>
+                  <span className={modalStyles.value}>
+                    {beritaAcara.trim() || '-'}
                   </span>
                 </div>
 

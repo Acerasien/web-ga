@@ -5,7 +5,6 @@ import {
   Clock, 
   PlusCircle, 
   FileText,
-  CheckCircle2, 
   Building2, 
   Tag, 
   ChevronLeft,
@@ -21,11 +20,11 @@ import {
   OngoingPaymentWithRelations 
 } from '@/lib/actions/ongoing';
 import { getTransactionById, TransactionWithRelations } from '@/lib/actions/transactions';
-import OngoingRequestModal from '@/components/modals/OngoingRequestModal';
+import Link from 'next/link';
 import OngoingRealizeModal from '@/components/modals/OngoingRealizeModal';
 import TransactionDetailModal from '@/components/modals/TransactionDetailModal';
 import ConfirmModal from '@/components/modals/ConfirmModal';
-import styles from '@/app/(dashboard)/transaksi/ongoing/page.module.css';
+import styles from '@/app/(dashboard)/ongoing/list/page.module.css';
 
 interface OngoingDashboardClientProps {
   user: AuthUser;
@@ -40,8 +39,7 @@ export default function OngoingDashboardClient({
 }: OngoingDashboardClientProps) {
   const [isPending, startTransition] = useTransition();
 
-  // Tab & Filters State
-  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
+  // Filters State
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   
@@ -52,9 +50,7 @@ export default function OngoingDashboardClient({
   const [totalPages, setTotalPages] = useState<number>(1);
   const limit = 9;
 
-  // Modals state
-  const [isRequestOpen, setIsRequestOpen] = useState<boolean>(false);
-  
+
   const [isRealizeOpen, setIsRealizeOpen] = useState<boolean>(false);
   const [realizeData, setRealizeData] = useState<{
     id: number;
@@ -75,7 +71,7 @@ export default function OngoingDashboardClient({
   const fetchPayments = useCallback(async () => {
     setLoading(true);
     try {
-      const statusFilter = activeTab === 'active' ? 'ACTIVE' : 'TER_REALISASI';
+      const statusFilter = 'ACTIVE';
       const branchFilter = selectedBranchId ? Number(selectedBranchId) : undefined;
       const categoryFilter = selectedCategoryId ? Number(selectedCategoryId) : undefined;
 
@@ -98,19 +94,13 @@ export default function OngoingDashboardClient({
     } finally {
       setLoading(false);
     }
-  }, [activeTab, selectedBranchId, selectedCategoryId, currentPage]);
+  }, [selectedBranchId, selectedCategoryId, currentPage]);
 
   // Trigger fetch when parameters change
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPayments();
   }, [fetchPayments]);
-
-  // Handle Tab Switch (reset page to 1)
-  const handleTabChange = (tab: 'active' | 'history') => {
-    setActiveTab(tab);
-    setCurrentPage(1);
-  };
 
   // Open Confirmation Modal
   const handlePayClick = (id: number) => {
@@ -180,30 +170,13 @@ export default function OngoingDashboardClient({
           </p>
         </div>
         {user.role !== 'VIEWER' && (
-          <button onClick={() => setIsRequestOpen(true)} className={styles.newRequestBtn}>
+          <Link href="/ongoing/input" className={styles.newRequestBtn}>
             <PlusCircle size={18} />
             <span>Buat Request</span>
-          </button>
+          </Link>
         )}
       </header>
 
-      {/* Tabs Row */}
-      <div className={styles.tabsContainer}>
-        <button
-          onClick={() => handleTabChange('active')}
-          className={`${styles.tabButton} ${activeTab === 'active' ? styles.tabButtonActive : ''}`}
-        >
-          <Clock size={16} />
-          <span>Active Request</span>
-        </button>
-        <button
-          onClick={() => handleTabChange('history')}
-          className={`${styles.tabButton} ${activeTab === 'history' ? styles.tabButtonActive : ''}`}
-        >
-          <CheckCircle2 size={16} />
-          <span>Riwayat Realisasi</span>
-        </button>
-      </div>
 
       {/* Filters Row */}
       <div className={styles.filtersBar}>
@@ -257,13 +230,13 @@ export default function OngoingDashboardClient({
               Belum ada data pembayaran berjalan yang tercatat untuk kriteria filter yang Anda pilih.
             </p>
           </div>
-          {user.role !== 'VIEWER' && activeTab === 'active' && (
-            <button onClick={() => setIsRequestOpen(true)} className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          {user.role !== 'VIEWER' && (
+            <Link href="/ongoing/input" className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               <span>Buat Permintaan Pertama</span>
-            </button>
+            </Link>
           )}
         </div>
-      ) : activeTab === 'active' ? (
+      ) : (
         /* Active Cards View */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
           <div className={styles.grid}>
@@ -374,136 +347,8 @@ export default function OngoingDashboardClient({
             </div>
           )}
         </div>
-      ) : (
-        /* History Table View */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-          <div className={styles.tableContainer}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={styles.th}>Tanggal</th>
-                  <th className={styles.th}>Cabang</th>
-                  <th className={styles.th}>Kategori</th>
-                  <th className={styles.th}>Deskripsi</th>
-                  <th className={styles.th} style={{ textAlign: 'right' }}>Estimasi</th>
-                  <th className={styles.th} style={{ textAlign: 'right' }}>Realisasi</th>
-                  <th className={styles.th} style={{ textAlign: 'right' }}>Selisih (Variance)</th>
-                  <th className={styles.th} style={{ textAlign: 'center' }}>BA Acara</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map((p) => {
-                  const est = p.amountNeeded;
-                  const act = p.actualAmount || 0;
-                  const variance = est - act;
-
-                  return (
-                    <tr key={p.id} className={styles.tr}>
-                      <td className={styles.td} style={{ whiteSpace: 'nowrap', color: 'var(--color-text-muted)' }}>
-                        {new Date(p.requestDate || p.createdAt).toLocaleDateString('id-ID', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </td>
-                      <td className={styles.td} style={{ fontWeight: 700 }}>
-                        {p.branch.code}
-                      </td>
-                      <td className={styles.td}>
-                        {p.category.name}
-                      </td>
-                      <td className={styles.td} style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.description}>
-                        {p.description}
-                      </td>
-                      <td className={styles.td} style={{ textAlign: 'right', fontWeight: 600 }}>
-                        {formatRupiah(est)}
-                      </td>
-                      <td className={styles.td} style={{ textAlign: 'right', fontWeight: 700, color: 'var(--color-primary)' }}>
-                        {formatRupiah(act)}
-                      </td>
-                      <td className={styles.td} style={{ textAlign: 'right' }}>
-                        {variance > 0 ? (
-                          <span className={styles.varianceSurplus} title="Sisa dana dikembalikan ke kas">
-                            +{formatRupiah(variance)} (Sisa)
-                          </span>
-                        ) : variance < 0 ? (
-                          <span className={styles.varianceShortage} title="Kekurangan dana ditambahkan">
-                            -{formatRupiah(Math.abs(variance))} (Kurang)
-                          </span>
-                        ) : (
-                          <span className={styles.varianceEqual}>
-                            Pas
-                          </span>
-                        )}
-                      </td>
-                      <td className={styles.td} style={{ textAlign: 'center' }}>
-                        {p.transactionId && p.transaction?.beritaAcara ? (
-                          <button
-                            onClick={() => handleTxClick(p.transactionId!)}
-                            disabled={txLoadingId === p.transactionId}
-                            className="btn btn-secondary"
-                            style={{ padding: '4px 10px', fontSize: '11px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            title="Klik untuk melihat detail Berita Acara Transaksi"
-                          >
-                            {txLoadingId === p.transactionId ? (
-                              <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
-                            ) : (
-                              <FileText size={12} style={{ color: 'var(--color-primary)' }} />
-                            )}
-                            <span>{p.transaction.beritaAcara.split('/')[0]}</span>
-                          </button>
-                        ) : (
-                          <span style={{ color: 'var(--color-text-muted)', fontSize: '11px' }}>-</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* History Pagination */}
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: 'var(--space-4)' }}>
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="btn btn-secondary"
-                style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}
-              >
-                <ChevronLeft size={16} />
-                <span>Sebelumnya</span>
-              </button>
-              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-muted)' }}>
-                Halaman {currentPage} dari {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="btn btn-secondary"
-                style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}
-              >
-                <span>Berikutnya</span>
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          )}
-        </div>
       )}
 
-      {/* New Request Modal */}
-      <OngoingRequestModal
-        isOpen={isRequestOpen}
-        onClose={() => setIsRequestOpen(false)}
-        onSubmitSuccess={() => {
-          setIsRequestOpen(false);
-          fetchPayments();
-        }}
-        user={user}
-        categories={categories}
-        branches={branches}
-      />
 
       {/* Realize Modal */}
       {realizeData && (

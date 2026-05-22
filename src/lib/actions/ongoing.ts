@@ -160,6 +160,7 @@ export async function createOngoingPayment(data: {
   amountNeeded: number;
   initialReceiptPath?: string;
   requestDate?: string;
+  frequency?: string;
 }): Promise<ApiResponse<void>> {
   try {
     const user = await getCurrentUser();
@@ -198,10 +199,11 @@ export async function createOngoingPayment(data: {
         initialReceiptPath: data.initialReceiptPath || null,
         requestDate: data.requestDate ? new Date(data.requestDate) : new Date(),
         status: 'BELUM_DIBAYAR',
+        frequency: data.frequency || null,
       },
     });
 
-    revalidatePath('/transaksi/ongoing');
+    revalidatePath('/ongoing/list');
 
     return { success: true, message: 'Request pembayaran berhasil dibuat.' };
   } catch (error) {
@@ -246,7 +248,7 @@ export async function updateOngoingStatusToPaid(id: number): Promise<ApiResponse
       data: { status: 'SUDAH_DIBAYAR' },
     });
 
-    revalidatePath('/transaksi/ongoing');
+    revalidatePath('/ongoing/list');
 
     return { success: true, message: 'Status pembayaran berhasil diperbarui menjadi Sudah Dibayar.' };
   } catch (error) {
@@ -269,6 +271,7 @@ export async function realizeOngoingPayment(
     vendor?: string;
     notes?: string;
     transactionDate?: string;
+    beritaAcara?: string;
   }
 ): Promise<ApiResponse<void>> {
   try {
@@ -305,103 +308,69 @@ export async function realizeOngoingPayment(
       return { success: false, error: 'Bukti realisasi (Foto/PDF) wajib dilampirkan.' };
     }
 
-    // Save transaction inside database with automatic Berita Acara (BA) generation & concurrency retry
+    if (!data.notes || !data.notes.trim()) {
+      return { success: false, error: 'Catatan tambahan wajib diisi.' };
+    }
+
+    // Save transaction inside database with optional custom Berita Acara (BA)
     const txDate = data.transactionDate ? new Date(data.transactionDate) : new Date();
-    const currentYear = txDate.getFullYear();
-    const startOfYear = new Date(currentYear, 0, 1);
-    const endOfYear = new Date(currentYear, 11, 31);
 
-    // Fetch the branch code
-    const branch = await prisma.branch.findUnique({
-      where: { id: payment.branchId },
-      select: { code: true },
-    });
-    const branchCode = branch?.code || 'UNK';
-
-    let retryCount = 0;
-    const maxRetries = 3;
-    let beritaAcara = '';
+    let finalBeritaAcara: string | null = null;
+    if (data.beritaAcara && data.beritaAcara.trim() !== '') {
+      const trimmedBA = data.beritaAcara.trim();
+      
+      // Perform unique constraint check beforehand to give a clean error message
+      const existing = await prisma.transaction.findFirst({
+        where: { beritaAcara: trimmedBA },
+        select: { id: true },
+      });
+      
+      if (existing) {
+        return {
+          success: false,
+          error: 'Nomor Berita Acara tersebut sudah digunakan. Silakan gunakan nomor lain.',
+        };
+      }
+      finalBeritaAcara = trimmedBA;
+    }
 
     // Run realization inside a transactional container
     await prisma.$transaction(async (tx) => {
-      while (retryCount < maxRetries) {
-        // Find the most recently created transaction for this branch and calendar year
-        const latestTx = await tx.transaction.findFirst({
-          where: {
-            branchId: payment.branchId,
-            transactionDate: {
-              gte: startOfYear,
-              lte: endOfYear,
-            },
-            beritaAcara: { not: null },
-          },
-          orderBy: { id: 'desc' },
-          select: { beritaAcara: true },
-        });
+      // 1. Create matching historical Transaction record
+      const createdTx = await tx.transaction.create({
+        data: {
+          branchId: payment.branchId,
+          userId: payment.userId, // Maintain original creator
+          categoryId: payment.categoryId,
+          transactionDate: txDate,
+          description: `[Realisasi] ${payment.description.trim()}`,
+          quantity: new Prisma.Decimal(1),
+          unit: 'Transaksi',
+          pricePerUnit: new Prisma.Decimal(data.actualAmount),
+          totalAmount: new Prisma.Decimal(data.actualAmount),
+          paymentMethod: data.paymentMethod,
+          vendor: data.vendor?.trim() || null,
+          receiptPath: data.finalReceiptPath,
+          notes: data.notes?.trim() || null,
+          beritaAcara: finalBeritaAcara,
+        },
+      });
 
-        let nextSerial = 1;
-        if (latestTx && latestTx.beritaAcara) {
-          const parts = latestTx.beritaAcara.split('/');
-          const latestSerial = parseInt(parts[0], 10);
-          if (!isNaN(latestSerial)) {
-            nextSerial = latestSerial + 1;
-          }
-        }
-
-        const nextSerialStr = String(nextSerial).padStart(4, '0');
-        const romanMonth = getRomanMonth(txDate);
-        beritaAcara = `${nextSerialStr}/BA-GA/${branchCode}/${romanMonth}/${currentYear}`;
-
-        try {
-          // 1. Create matching historical Transaction record
-          const createdTx = await tx.transaction.create({
-            data: {
-              branchId: payment.branchId,
-              userId: payment.userId, // Maintain original creator
-              categoryId: payment.categoryId,
-              transactionDate: txDate,
-              description: `[Realisasi] ${payment.description.trim()}`,
-              quantity: new Prisma.Decimal(1),
-              unit: 'Transaksi',
-              pricePerUnit: new Prisma.Decimal(data.actualAmount),
-              totalAmount: new Prisma.Decimal(data.actualAmount),
-              paymentMethod: data.paymentMethod,
-              vendor: data.vendor?.trim() || null,
-              receiptPath: data.finalReceiptPath,
-              notes: data.notes?.trim() || null,
-              beritaAcara,
-            },
-          });
-
-          // 2. Update OngoingPayment status, link transactionId
-          await tx.ongoingPayment.update({
-            where: { id },
-            data: {
-              status: 'TER_REALISASI',
-              isMoneyEnough: data.isMoneyEnough,
-              actualAmount: new Prisma.Decimal(data.actualAmount),
-              finalReceiptPath: data.finalReceiptPath,
-              transactionId: createdTx.id,
-            },
-          });
-
-          break; // Success! Exit retry loop
-        } catch (error) {
-          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-            retryCount++;
-            if (retryCount >= maxRetries) {
-              throw new Error('Gagal membuat nomor Berita Acara yang unik karena kepadatan transaksi tinggi. Silakan coba lagi.');
-            }
-            await new Promise((resolve) => setTimeout(resolve, 50));
-          } else {
-            throw error;
-          }
-        }
-      }
+      // 2. Update OngoingPayment status, link transactionId
+      await tx.ongoingPayment.update({
+        where: { id },
+        data: {
+          status: 'TER_REALISASI',
+          isMoneyEnough: data.isMoneyEnough,
+          actualAmount: new Prisma.Decimal(data.actualAmount),
+          finalReceiptPath: data.finalReceiptPath,
+          transactionId: createdTx.id,
+        },
+      });
     });
 
     revalidatePath('/dashboard');
-    revalidatePath('/transaksi/ongoing');
+    revalidatePath('/ongoing/list');
     revalidatePath('/transaksi/riwayat');
 
     return { success: true, message: 'Pembayaran berhasil direalisasikan dan dicatat di riwayat.' };

@@ -33,6 +33,7 @@ export default function OngoingRealizeModal({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
   const [vendor, setVendor] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [beritaAcara, setBeritaAcara] = useState<string>('');
   const [receiptPath, setReceiptPath] = useState<string>('');
   const [transactionDate, setTransactionDate] = useState<string>(() => {
     const d = new Date();
@@ -124,6 +125,10 @@ export default function OngoingRealizeModal({
       setError('Bukti realisasi akhir (Foto/PDF) wajib dilampirkan.');
       return;
     }
+    if (!notes.trim()) {
+      setError('Catatan tambahan wajib diisi.');
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -135,6 +140,7 @@ export default function OngoingRealizeModal({
           vendor: vendor.trim() || undefined,
           notes: notes.trim() || undefined,
           transactionDate,
+          beritaAcara: beritaAcara.trim() || undefined,
         });
 
         if (res.success) {
@@ -160,6 +166,7 @@ export default function OngoingRealizeModal({
     setPaymentMethod(PaymentMethod.CASH);
     setVendor('');
     setNotes('');
+    setBeritaAcara('');
     setReceiptPath('');
     setFileName('');
     setFileSize('');
@@ -231,6 +238,20 @@ export default function OngoingRealizeModal({
                       onChange={(e) => setTransactionDate(e.target.value)}
                       required
                       style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', fontFamily: 'var(--font-body)' }}
+                    />
+                  </div>
+
+                  {/* Nomor Berita Acara Input */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                      Nomor Berita Acara (Opsional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 0001/BA-GA/HO/V/2026"
+                      value={beritaAcara}
+                      onChange={(e) => setBeritaAcara(e.target.value)}
+                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }}
                     />
                   </div>
 
@@ -318,12 +339,13 @@ export default function OngoingRealizeModal({
                   {/* Notes / Remarks Input */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-                      Catatan Tambahan (Opsional)
+                      Catatan Tambahan <span style={{ color: 'var(--color-danger)' }}>*</span>
                     </label>
                     <textarea
                       placeholder="Contoh: Cat tembok 2 pail warna abu-abu muda, nota terlampir."
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
+                      required
                       rows={2}
                       style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', resize: 'none' }}
                     />

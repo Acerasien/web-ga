@@ -342,7 +342,7 @@ export default function DashboardClient({
                 {initialStats.activeOngoingPayments.map((p) => (
                   <Link 
                     key={p.id}
-                    href="/transaksi/ongoing"
+                    href="/ongoing/list"
                     className="checklist-card"
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

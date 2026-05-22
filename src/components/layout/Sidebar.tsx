@@ -24,7 +24,9 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY', 'VIEWER'] },
   { label: 'Input Transaksi', href: '/transaksi/input', icon: 'PlusCircle', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY'] },
   { label: 'Riwayat', href: '/transaksi/riwayat', icon: 'ClipboardList', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY'] },
-  { label: 'Ongoing Payment', href: '/transaksi/ongoing', icon: 'Clock', roles: ['SUPERADMIN', 'ADMIN'] },
+  { label: 'Daftar Pembayaran', href: '/ongoing/list', icon: 'Clock', roles: ['SUPERADMIN', 'ADMIN'] },
+  { label: 'Input Pembayaran', href: '/ongoing/input', icon: 'PlusCircle', roles: ['SUPERADMIN', 'ADMIN'] },
+  { label: 'Riwayat Pembayaran', href: '/ongoing/riwayat', icon: 'ClipboardList', roles: ['SUPERADMIN', 'ADMIN'] },
   { label: 'Import Data', href: '/transaksi/import', icon: 'Upload', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY'] },
   { label: 'Laporan', href: '/laporan', icon: 'BarChart3', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY', 'VIEWER'] },
   { label: 'Pengguna', href: '/admin/users', icon: 'Users', roles: ['SUPERADMIN'] },
@@ -69,8 +71,9 @@ export default function Sidebar({
     item.roles.includes(user.role)
   );
 
-  // Group items: main nav vs admin
-  const mainItems = visibleItems.filter((item) => !item.href.startsWith('/admin'));
+  // Group items: main nav vs ongoing vs admin
+  const mainItems = visibleItems.filter((item) => !item.href.startsWith('/admin') && !item.href.startsWith('/ongoing'));
+  const ongoingItems = visibleItems.filter((item) => item.href.startsWith('/ongoing'));
   const adminItems = visibleItems.filter((item) => item.href.startsWith('/admin'));
 
   return (
@@ -112,6 +115,32 @@ export default function Sidebar({
             );
           })}
         </ul>
+
+        {ongoingItems.length > 0 && (
+          <>
+            <div className={styles.navDivider}>
+              {!collapsed && <span>Pembayaran Berjalan</span>}
+            </div>
+            <ul className={styles.navList}>
+              {ongoingItems.map((item) => {
+                const Icon = ICON_MAP[item.icon];
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className={`${styles.navItem} ${isActive ? styles.active : ''}`}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      <Icon size={20} />
+                      {!collapsed && <span>{item.label}</span>}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
 
         {adminItems.length > 0 && (
           <>

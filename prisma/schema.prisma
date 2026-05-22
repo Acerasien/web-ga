@@ -155,6 +155,7 @@ model OngoingPayment {
   isMoneyEnough      Boolean?       @map("is_money_enough")
   actualAmount       Decimal?       @map("actual_amount") @db.Decimal(15, 2)
   transactionId      Int?           @unique @map("transaction_id")
+  frequency          String?        @db.VarChar(20) // e.g. "Monthly", "Yearly", "One-time"
   requestDate        DateTime       @default(now()) @map("request_date") @db.Date
   createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz

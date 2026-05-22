@@ -65,6 +65,7 @@ export interface TransactionFormData {
   receiptPath?: string;
   notes?: string;
   customFields?: Record<string, string | number>;
+  beritaAcara?: string;
 }
 
 // ============================================================

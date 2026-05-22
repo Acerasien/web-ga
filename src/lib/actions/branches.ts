@@ -313,7 +313,7 @@ export async function deleteBranch(id: number): Promise<ApiResponse<{ success: b
 
     revalidatePath('/admin/branches');
     revalidatePath('/admin/users');
-    revalidatePath('/transaksi/ongoing');
+    revalidatePath('/ongoing/list');
     revalidatePath('/transaksi/riwayat');
     revalidatePath('/laporan');
 

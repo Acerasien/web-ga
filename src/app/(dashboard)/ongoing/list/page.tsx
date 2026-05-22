@@ -4,7 +4,7 @@ import { getCategoriesWithSub, getBranches } from '@/lib/actions/categories';
 import OngoingDashboardClient from '@/components/ongoing/OngoingDashboardClient';
 
 /**
- * Server page component for the Ongoing Payment route (/transaksi/ongoing).
+ * Server page component for the Ongoing Payment route (/ongoing/list).
  * Resolves active session data, enforces strict role-based access boundaries (Poka-Yoke),
  * and feeds metadata into the dashboard components.
  */
