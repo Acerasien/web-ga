@@ -21,6 +21,10 @@ import type { Branch, PaymentMethod } from '@prisma/client';
 import styles from '@/app/(dashboard)/transaksi/input/input.module.css';
 import modalStyles from '@/components/modals/modal.module.css';
 
+import TransactionSuccessAlert from './TransactionFormParts/TransactionSuccessAlert';
+import ReceiptUploadDropzone from './TransactionFormParts/ReceiptUploadDropzone';
+import DynamicCustomFields from './TransactionFormParts/DynamicCustomFields';
+
 interface TransactionFormProps {
   user: AuthUser;
   categories: CategoryWithSub[];
@@ -88,22 +92,7 @@ export default function TransactionForm({ user, categories, branches }: Transact
     setFormError(null);
   };
 
-  // Drag-and-drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
 
-  const handleFileDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (uploading || isPending) return;
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleUpload(file);
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleUpload(file);
-  };
 
   const handleUpload = async (file: File) => {
     setUploading(true);
@@ -253,25 +242,7 @@ export default function TransactionForm({ user, categories, branches }: Transact
 
       {/* Success alert with option to reset or view list (Enterprise UX) */}
       {formSuccess ? (
-        <div className={`${styles.formCard} ${styles.alertSuccess}`} style={{ textAlign: 'center', display: 'block' }}>
-          <CheckCircle2 size={48} style={{ margin: '0 auto var(--space-4)', color: 'var(--color-success)' }} />
-          <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
-            Transaksi Berhasil Dicatat!
-          </h3>
-          <p style={{ marginBottom: 'var(--space-6)', color: 'var(--color-text-muted)' }}>
-            Data pengeluaran telah terekam aman ke dalam database aktivitas General Affairs.
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-4)' }}>
-            <button onClick={() => setFormSuccess(false)} className={styles.submitBtn}>
-              <PlusCircle size={18} />
-              <span>Catat Transaksi Baru</span>
-            </button>
-            <Link href="/transaksi/riwayat" className={styles.cancelBtn}>
-              <span>Lihat Riwayat Transaksi</span>
-              <ArrowRight size={18} style={{ marginLeft: 'var(--space-2)' }} />
-            </Link>
-          </div>
-        </div>
+        <TransactionSuccessAlert onReset={() => setFormSuccess(false)} />
       ) : (
         <form onSubmit={handlePreSubmit} className={styles.formCard} noValidate>
           {formError && (
@@ -401,63 +372,13 @@ export default function TransactionForm({ user, categories, branches }: Transact
           </div>
 
           {/* Dynamic Custom Fields Grid */}
-          {dynamicFields.length > 0 && (
-            <>
-              <h3 className={styles.sectionTitle}>Informasi Tambahan ({selectedCategory?.name})</h3>
-              <div className={styles.formGrid}>
-                {dynamicFields.map((field) => {
-                  const val = customFields[field.key] ?? '';
-                  return (
-                    <div key={field.key} className={styles.formGroup}>
-                      <label htmlFor={field.key} className={`${styles.label} ${field.required ? styles.labelRequired : ''}`}>
-                        {field.label}
-                      </label>
-
-                      {field.type === 'select' ? (
-                        <select
-                          id={field.key}
-                          className={styles.input}
-                          value={val}
-                          onChange={(e) => setCustomFields(prev => ({ ...prev, [field.key]: e.target.value }))}
-                          disabled={isPending}
-                          required={field.required}
-                        >
-                          <option value="">-- Pilih {field.label} --</option>
-                          {field.options?.map(opt => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      ) : field.type === 'textarea' ? (
-                        <textarea
-                          id={field.key}
-                          className={`${styles.input} ${styles.textarea}`}
-                          value={val}
-                          onChange={(e) => setCustomFields(prev => ({ ...prev, [field.key]: e.target.value }))}
-                          disabled={isPending}
-                          required={field.required}
-                          placeholder={`Masukkan ${field.label.toLowerCase()}`}
-                        />
-                      ) : (
-                        <input
-                          id={field.key}
-                          type={field.type}
-                          className={styles.input}
-                          value={val}
-                          onChange={(e) => {
-                            const inputVal = field.type === 'number' && e.target.value !== '' ? Number(e.target.value) : e.target.value;
-                            setCustomFields(prev => ({ ...prev, [field.key]: inputVal }));
-                          }}
-                          disabled={isPending}
-                          required={field.required}
-                          placeholder={`Masukkan ${field.label.toLowerCase()}`}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
+          <DynamicCustomFields
+            dynamicFields={dynamicFields}
+            customFields={customFields}
+            categoryName={selectedCategory?.name}
+            isPending={isPending}
+            onChange={(key, value) => setCustomFields(prev => ({ ...prev, [key]: value }))}
+          />
 
           <h3 className={styles.sectionTitle}>Rincian Biaya & Pembayaran</h3>
           <div className={styles.formGrid}>
@@ -600,90 +521,16 @@ export default function TransactionForm({ user, categories, branches }: Transact
           </div>
 
           <h3 className={styles.sectionTitle}>Bukti Pembayaran (Kuitansi / Nota)</h3>
-          <div style={{ marginBottom: 'var(--space-8)' }}>
-            {receiptPath ? (
-              // Preview Box
-              <div className={styles.previewFrame}>
-                {uploadFileName.toLowerCase().endsWith('.pdf') ? (
-                  <div style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: 'var(--radius-sm)',
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--color-danger)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)'
-                  }}>
-                    <FileText size={32} />
-                  </div>
-                ) : (
-                  <img src={receiptPath} alt="Bukti kuitansi" className={styles.previewThumb} />
-                )}
-                <div className={styles.previewMeta}>
-                  <span className={styles.previewName}>{uploadFileName}</span>
-                  <span className={styles.previewSize}>{uploadFileSize}</span>
-                </div>
-                <button
-                  type="button"
-                  className={styles.deleteBtn}
-                  onClick={handleRemoveReceipt}
-                  disabled={isPending}
-                  aria-label="Hapus berkas kuitansi"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            ) : (
-              // Drag & Drop Box
-              <div
-                className={`${styles.uploaderContainer} ${uploading || isPending ? styles.uploadDisabled : ''}`}
-                onDragOver={handleDragOver}
-                onDrop={handleFileDrop}
-                onClick={() => !uploading && !isPending && fileInputRef.current?.click()}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    if (!uploading && !isPending) fileInputRef.current?.click();
-                  }
-                }}
-              >
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  accept=".png, .jpg, .jpeg, .pdf"
-                  onChange={handleFileSelect}
-                  disabled={uploading || isPending}
-                />
-
-                {uploading ? (
-                  <>
-                    <div className={styles.spinner} style={{ borderTopColor: 'var(--color-primary)', width: '28px', height: '28px' }} />
-                    <span className={styles.uploaderText}>Mengunggah berkas kuitansi...</span>
-                  </>
-                ) : (
-                  <>
-                    <UploadCloud size={36} className={styles.uploaderIcon} />
-                    <span className={styles.uploaderText}>
-                      Tarik & lepas berkas kuitansi di sini, atau <span className={styles.uploaderLink}>Pilih Berkas</span>
-                    </span>
-                    <span className={styles.uploaderText} style={{ fontSize: 'var(--text-xs)', opacity: 0.7 }}>
-                      Mendukung PNG, JPG, JPEG, atau PDF (Maks. 5MB)
-                    </span>
-                  </>
-                )}
-
-                {uploadError && (
-                  <div style={{ marginTop: 'var(--space-2)', color: 'var(--color-danger)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
-                    {uploadError}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <ReceiptUploadDropzone
+            receiptPath={receiptPath}
+            uploadFileName={uploadFileName}
+            uploadFileSize={uploadFileSize}
+            uploadError={uploadError}
+            uploading={uploading}
+            isPending={isPending}
+            onUpload={handleUpload}
+            onRemove={handleRemoveReceipt}
+          />
 
           {/* Form Actions Footer */}
           <div className={styles.actionRow}>

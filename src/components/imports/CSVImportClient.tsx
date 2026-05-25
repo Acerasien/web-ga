@@ -6,12 +6,11 @@ import * as XLSX from 'xlsx';
 import { 
   Upload, 
   FileSpreadsheet, 
-  CheckCircle, 
-  AlertTriangle, 
-  AlertCircle, 
-  History,
-  LayoutDashboard
+  AlertCircle 
 } from 'lucide-react';
+import CSVImportSpecsGuide from './CSVImportParts/CSVImportSpecsGuide';
+import CSVImportPreviewTable from './CSVImportParts/CSVImportPreviewTable';
+import { CSVImportSuccessView, CSVImportFailView } from './CSVImportParts/CSVImportResultViews';
 import { importTransactions } from '@/lib/actions/imports';
 import type { CSVImportResult } from '@/lib/actions/imports';
 import type { AuthUser } from '@/types';
@@ -342,66 +341,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       <div className={styles.card}>
         {/* Specs & Guide banner shown by default unless showing success page */}
         {(!result || result.errors.length > 0) && (
-          <div className={styles.specsBox} style={{ display: 'flex', gap: 'var(--space-4)' }}>
-            <FileSpreadsheet size={24} className={styles.specsIcon} />
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span className={styles.specsTitle}>Spesifikasi Header & Format Kolom Excel / CSV:</span>
-              <span style={{ fontSize: 'var(--text-xs)', lineHeight: 1.5 }}>
-                Pastikan baris pertama file Anda berisi nama kolom berikut (tidak harus berurutan):
-              </span>
-              
-              {/* Responsive wrapped badges / tags row to prevent overflow */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 6px', marginTop: '6px', marginBottom: '6px' }}>
-                {['Tanggal', 'Kategori', 'Sub-Kategori', 'Deskripsi', 'Kuantitas', 'Satuan', 'Harga Satuan', 'Pembayaran', 'Vendor', 'Catatan'].map(col => (
-                  <span key={col} style={{ 
-                    fontSize: '10px', 
-                    fontFamily: 'var(--font-mono)', 
-                    padding: '2px 8px', 
-                    backgroundColor: 'var(--color-bg)', 
-                    border: '1px solid var(--color-border)', 
-                    borderRadius: '12px', 
-                    color: 'var(--color-text-light)', 
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {col}
-                  </span>
-                ))}
-              </div>
-
-              <ul style={{ margin: 'var(--space-2) 0 0 0', paddingLeft: 'var(--space-4)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <li><strong>Tanggal</strong> mendukung format <code style={{ fontWeight: 600 }}>YYYY-MM-DD</code> atau standard Excel Indonesia <code style={{ fontWeight: 600 }}>DD/MM/YYYY</code>.</li>
-                <li><strong>Pembayaran</strong> menerima salah satu nilai berikut: <code style={{ fontWeight: 600 }}>CASH</code>, <code style={{ fontWeight: 600 }}>TRANSFER</code>, atau <code style={{ fontWeight: 600 }}>PETTY_CASH</code>.</li>
-                <li><strong>Kategori Mismatch (Poka-Yoke)</strong>: Jika nama kategori tidak dikenali di database, transaksi otomatis dipetakan ke kategori <code style={{ fontWeight: 600 }}>"Lain-lain"</code>.</li>
-                <li><strong>Relational Rollback (Atomic Safeguard)</strong>: Jika terdapat kesalahan format pada baris mana pun, seluruh impor akan digagalkan dan dibatalkan (rollback) untuk menjaga integritas database.</li>
-              </ul>
-
-              <div style={{ marginTop: 'var(--space-4)', borderTop: '1px solid rgba(59, 130, 246, 0.1)', paddingTop: 'var(--space-3)' }}>
-                <button
-                  type="button"
-                  onClick={handleDownloadTemplate}
-                  className="btn btn-secondary btn-sm"
-                  style={{ 
-                    display: 'inline-flex', 
-                    alignItems: 'center', 
-                    gap: 'var(--space-2)',
-                    borderColor: 'var(--color-primary)',
-                    color: 'var(--color-primary)',
-                    backgroundColor: 'transparent',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    padding: '4px 12px',
-                    height: '30px',
-                    cursor: 'pointer'
-                  }}
-                  title="Unduh file template Excel (.xlsx) sebagai acuan pengisian data"
-                >
-                  <FileSpreadsheet size={14} />
-                  <span>Unduh Template Excel (.xlsx)</span>
-                </button>
-              </div>
-            </div>
-          </div>
+          <CSVImportSpecsGuide onDownloadTemplate={handleDownloadTemplate} />
         )}
 
         {generalError && !result && (
@@ -423,58 +363,10 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         ) : result ? (
           result.errors.length === 0 ? (
             /* Importer Success View */
-            <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'rgba(34, 197, 94, 0.1)', color: 'var(--color-success)', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
-                <CheckCircle size={36} />
-              </div>
-              <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--color-text)', marginBottom: 'var(--space-2)' }}>
-                Impor Data Sukses!
-              </h3>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', maxWidth: '480px', margin: '0 auto var(--space-8)' }}>
-                Sebanyak <strong>{result.importedCount}</strong> baris transaksi pengeluaran GA berhasil divalidasi dan diunggah secara aman ke database.
-              </p>
-
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-                <Link href="/transaksi/riwayat" className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  <History size={18} />
-                  <span>Lihat Riwayat</span>
-                </Link>
-                <Link href="/dashboard" className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  <LayoutDashboard size={18} />
-                  <span>Ke Dashboard</span>
-                </Link>
-              </div>
-            </div>
+            <CSVImportSuccessView result={result} />
           ) : (
             /* Importer Fail / Rollback View */
-            <div className={styles.errorCard}>
-              <div className={styles.errorBanner}>
-                <AlertTriangle size={24} style={{ flexShrink: 0, marginTop: '2px' }} />
-                <div>
-                  <h4 className={styles.errorTitle}>Impor Data Ditolak (Database Rollback Aktif)</h4>
-                  <p className={styles.errorSub}>
-                    Ditemukan <strong>{result.errors.length}</strong> kesalahan format data. Seluruh pengunggahan dibatalkan demi menjaga integritas keuangan sistem.
-                  </p>
-                </div>
-              </div>
-
-              <div className={styles.errorScroll}>
-                {result.errors.map((err, idx) => (
-                  <div key={idx} className={styles.errorLine}>
-                    &bull; {err}
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-                <button type="button" className="btn btn-secondary" onClick={handleCancelFile}>
-                  Batal
-                </button>
-                <button type="button" className="btn btn-primary" onClick={handleCancelFile}>
-                  Perbaiki & Coba Lagi
-                </button>
-              </div>
-            </div>
+            <CSVImportFailView result={result} onCancel={handleCancelFile} />
           )
         ) : file ? (
           /* File Selected View (Ready to submit) */
@@ -504,124 +396,10 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
 
             {/* Interactive Client Preview Panel */}
             {previewSummary && (
-              <div className={styles.previewWrapper}>
-                <header className={styles.previewHeader}>
-                  <h4 className={styles.previewTitle}>Pratinjau Data Transaksi</h4>
-                  <p className={styles.previewSub}>
-                    Silakan tinjau data transaksi di bawah sebelum mengonfirmasi pengunggahan ke database.
-                  </p>
-                </header>
-
-                {/* Summary Cards Grid */}
-                <div className={styles.previewGrid}>
-                  <div className={styles.previewStatCard}>
-                    <span className={styles.previewStatLabel}>Total Transaksi</span>
-                    <span className={styles.previewStatValue}>{previewSummary.totalRows} Baris</span>
-                  </div>
-                  <div className={styles.previewStatCard}>
-                    <span className={styles.previewStatLabel}>Estimasi Total Biaya</span>
-                    <span className={styles.previewStatValue} style={{ color: 'var(--color-primary)' }}>
-                      {formatRupiah(previewSummary.totalAmount)}
-                    </span>
-                  </div>
-                  <div className={styles.previewStatCard}>
-                    <span className={styles.previewStatLabel}>Status Validasi</span>
-                    <span className={styles.previewStatValue}>
-                      {previewSummary.hasErrors ? (
-                        <span className="badge badge-danger" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', fontSize: '10px' }}>
-                          <AlertCircle size={10} />
-                          Terdapat Error
-                        </span>
-                      ) : (
-                        <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', fontSize: '10px' }}>
-                          <CheckCircle size={10} />
-                          Format Sesuai
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                {previewSummary.hasErrors && (
-                  <div className={styles.errorBanner} style={{ margin: 0, padding: 'var(--space-3) var(--space-4)' }}>
-                    <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <div style={{ fontSize: 'var(--text-xs)', lineHeight: 1.4 }}>
-                      <strong>Format File Bermasalah:</strong> Beberapa baris di bawah memiliki kesalahan format. Tombol unggah dinonaktifkan sementara. Perbaiki file template Anda dan unggah kembali.
-                    </div>
-                  </div>
-                )}
-
-                {/* Dynamic Preview Grid Table */}
-                {previewRows.length > 0 ? (
-                  <div>
-                    <div className={styles.previewTableScroll}>
-                      <table className={styles.previewTable}>
-                        <thead>
-                          <tr>
-                            <th>Baris</th>
-                            <th>Tanggal</th>
-                            <th>Kategori</th>
-                            <th>Deskripsi Kebutuhan</th>
-                            <th>Qty & Satuan</th>
-                            <th>Harga Satuan</th>
-                            <th>Subtotal</th>
-                            <th>Pembayaran</th>
-                            <th>Vendor Mapped</th>
-                            <th>Keterangan</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {/* Limit view to first 10 rows as per user feedback */}
-                          {previewRows.slice(0, 10).map((row, idx) => {
-                            const isRowInvalid = row.errors.length > 0;
-                            return (
-                              <tr key={idx} className={isRowInvalid ? styles.errorRow : ''}>
-                                <td style={{ fontWeight: 600, color: 'var(--color-text-muted)' }}>#{row.rowNum}</td>
-                                <td className={!row.date ? styles.errorCell : ''} title={row.errors.find((e: string) => e.includes('Tanggal')) || ''}>
-                                  {row.date || '-'}
-                                </td>
-                                <td>{row.category} {row.subCategory ? `(${row.subCategory})` : ''}</td>
-                                <td className={!row.description ? styles.errorCell : ''} title={row.errors.find((e: string) => e.includes('Deskripsi')) || ''}>
-                                  {row.description || '-'}
-                                </td>
-                                <td className={row.errors.some((e: string) => e.includes('Kuantitas')) ? styles.errorCell : ''}>
-                                  {row.quantity} {row.unit}
-                                </td>
-                                <td className={row.errors.some((e: string) => e.includes('Harga')) ? styles.errorCell : ''}>
-                                  {formatRupiah(row.pricePerUnit)}
-                                </td>
-                                <td style={{ fontWeight: 600 }}>{formatRupiah(row.subtotal)}</td>
-                                <td>{formatPaymentMethod(row.paymentMethod)}</td>
-                                <td>{row.vendor || '-'}</td>
-                                <td>
-                                  {isRowInvalid ? (
-                                    <span style={{ color: 'var(--color-danger)', fontWeight: 600, fontSize: '10px' }} title={row.errors.join(', ')}>
-                                      ⚠️ {row.errors[0]}
-                                    </span>
-                                  ) : (
-                                    <span style={{ color: 'var(--color-success)', fontSize: '10px', fontWeight: 600 }}>Siap</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                    {previewRows.length > 10 && (
-                      <p className={styles.footnote}>
-                        * Menampilkan 10 dari <strong>{previewRows.length}</strong> total baris transaksi terdeteksi.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ textAlign: 'center', padding: 'var(--space-4)', border: '1.5px dashed var(--color-border)', borderRadius: 'var(--radius-md)' }}>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-light)' }}>
-                      Kolom template tidak lengkap atau tidak dapat dibaca. Pastikan header sesuai spesifikasi.
-                    </span>
-                  </div>
-                )}
-              </div>
+              <CSVImportPreviewTable 
+                previewSummary={previewSummary}
+                previewRows={previewRows}
+              />
             )}
           </>
         ) : (

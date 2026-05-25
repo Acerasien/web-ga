@@ -28,6 +28,7 @@ export default function TransactionDetailModal({
 
   if (!isOpen || !transaction) return null;
 
+
   // Format payment method badge styling
   const getPaymentLabel = (method: string) => {
     switch (method) {
@@ -262,15 +263,16 @@ export default function TransactionDetailModal({
           </div>
         </div>
 
-        {/* Modal Footer (Superadmin actions only) */}
-        {currentUserRole === 'SUPERADMIN' && (
-          <footer className={styles.footer}>
-            {deleteError && (
-              <span className={styles.errorMessage}>
-                <AlertCircle size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
-                {deleteError}
-              </span>
-            )}
+        {/* Modal Footer (Action Footer for all users) */}
+        <footer className={styles.footer}>
+          {deleteError && (
+            <span className={styles.errorMessage}>
+              <AlertCircle size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
+              {deleteError}
+            </span>
+          )}
+          
+          {currentUserRole === 'SUPERADMIN' && (
             <button
               onClick={handleDelete}
               disabled={isDeleting}
@@ -289,8 +291,8 @@ export default function TransactionDetailModal({
                 </>
               )}
             </button>
-          </footer>
-        )}
+          )}
+        </footer>
       </div>
     </div>
   );
