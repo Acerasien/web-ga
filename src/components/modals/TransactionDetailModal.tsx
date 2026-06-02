@@ -104,12 +104,47 @@ export default function TransactionDetailModal({
           <div>
             <h4 className={styles.sectionTitle}>Ringkasan Biaya</h4>
             <div className={styles.grid}>
-              <div className={styles.item}>
-                <span className={styles.label}>Estimasi Total Pengeluaran</span>
-                <span className={styles.valueHighlight}>
-                  {formatRupiah(Number(transaction.totalAmount))}
-                </span>
-              </div>
+              {/* Conditional breakdown: show if any breakdown field is present */}
+              {(transaction.discountPerUnit || transaction.discountTotal || transaction.taxAmount) ? (
+                <div className={styles.item} style={{ gridColumn: 'span 2' }}>
+                  <span className={styles.label}>Rincian Harga</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', marginTop: 'var(--space-1)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+                      <span>Subtotal ({Number(transaction.quantity)} × {formatRupiah(Number(transaction.pricePerUnit))})</span>
+                      <span>{formatRupiah(Number(transaction.quantity) * Number(transaction.pricePerUnit))}</span>
+                    </div>
+                    {transaction.discountPerUnit && Number(transaction.discountPerUnit) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}>
+                        <span>Diskon per satuan (×{Number(transaction.quantity)})</span>
+                        <span>−{formatRupiah(Number(transaction.discountPerUnit) * Number(transaction.quantity))}</span>
+                      </div>
+                    )}
+                    {transaction.discountTotal && Number(transaction.discountTotal) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}>
+                        <span>Diskon total tagihan</span>
+                        <span>−{formatRupiah(Number(transaction.discountTotal))}</span>
+                      </div>
+                    )}
+                    {transaction.taxAmount && Number(transaction.taxAmount) > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', color: 'var(--color-success)' }}>
+                        <span>Pajak{transaction.taxNote ? ` (${transaction.taxNote})` : ''}</span>
+                        <span>+{formatRupiah(Number(transaction.taxAmount))}</span>
+                      </div>
+                    )}
+                    <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-2)', display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                      <span>Total</span>
+                      <span className={styles.valueHighlight}>{formatRupiah(Number(transaction.totalAmount))}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.item}>
+                  <span className={styles.label}>Estimasi Total Pengeluaran</span>
+                  <span className={styles.valueHighlight}>
+                    {formatRupiah(Number(transaction.totalAmount))}
+                  </span>
+                </div>
+              )}
               <div className={styles.item}>
                 <span className={styles.label}>Detail Kuantitas</span>
                 <span className={styles.value}>

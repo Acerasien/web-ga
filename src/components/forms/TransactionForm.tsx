@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useRef } from 'react';
+import { useState, useTransition, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import {
   UploadCloud,
@@ -11,7 +11,10 @@ import {
   Calculator,
   ArrowRight,
   PlusCircle,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Tag,
 } from 'lucide-react';
 import { createTransaction } from '@/lib/actions/transactions';
 import { formatRupiah } from '@/lib/formatters';
@@ -29,14 +32,15 @@ interface TransactionFormProps {
   user: AuthUser;
   categories: CategoryWithSub[];
   branches: Branch[];
+  initialOngoingPayment?: any;
 }
 
-export default function TransactionForm({ user, categories, branches }: TransactionFormProps) {
+export default function TransactionForm({ user, categories, branches, initialOngoingPayment }: TransactionFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
 
   // Primary form fields states
-  const [categoryId, setCategoryId] = useState<string>('');
+  const [categoryId, setCategoryId] = useState<string>(initialOngoingPayment?.categoryId ? String(initialOngoingPayment.categoryId) : '');
   const [subCategoryId, setSubCategoryId] = useState<string>('');
   const [transactionDate, setTransactionDate] = useState<string>(() => {
     const d = new Date();
@@ -45,15 +49,19 @@ export default function TransactionForm({ user, categories, branches }: Transact
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
-  const [description, setDescription] = useState<string>('');
+  const [description, setDescription] = useState<string>(initialOngoingPayment?.description || '');
   const [quantity, setQuantity] = useState<number>(1);
   const [unit, setUnit] = useState<string>('Pcs');
-  const [pricePerUnit, setPricePerUnit] = useState<number>(0);
-  const [priceDisplay, setPriceDisplay] = useState<string>('');
+  
+  // If amountNeeded is known, prefill pricePerUnit
+  const initialPrice = initialOngoingPayment?.amountNeeded || 0;
+  const [pricePerUnit, setPricePerUnit] = useState<number>(initialPrice);
+  const [priceDisplay, setPriceDisplay] = useState<string>(initialPrice > 0 ? initialPrice.toLocaleString('id-ID') : '');
+  
   const [paymentMethod, setPaymentMethod] = useState<string>('CASH');
   const [vendor, setVendor] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
-  const [branchId, setBranchId] = useState<string>('');
+  const [branchId, setBranchId] = useState<string>(initialOngoingPayment?.branchId ? String(initialOngoingPayment.branchId) : '');
   const [beritaAcara, setBeritaAcara] = useState<string>('');
 
   // Dynamic custom fields states
@@ -72,8 +80,29 @@ export default function TransactionForm({ user, categories, branches }: Transact
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Computed Values
-  const totalAmount = quantity * pricePerUnit;
+  // Breakdown fields (Rincian Harga — all optional)
+  const [breakdownOpen, setBreakdownOpen] = useState<boolean>(false);
+  const [discountPerUnit, setDiscountPerUnit] = useState<number>(0);
+  const [discountPerUnitDisplay, setDiscountPerUnitDisplay] = useState<string>('');
+  const [discountTotal, setDiscountTotal] = useState<number>(0);
+  const [discountTotalDisplay, setDiscountTotalDisplay] = useState<string>('');
+  const [taxAmount, setTaxAmount] = useState<number>(0);
+  const [taxAmountDisplay, setTaxAmountDisplay] = useState<string>('');
+  const [taxNote, setTaxNote] = useState<string>('');
+
+  // Computed totals with live breakdown
+  const subtotal = quantity * pricePerUnit;
+  const [computedTotal, setComputedTotal] = useState<number>(0);
+
+  useEffect(() => {
+    let total = quantity * pricePerUnit;
+    if (breakdownOpen) {
+      total -= discountPerUnit * quantity;
+      total -= discountTotal;
+      total += taxAmount;
+    }
+    setComputedTotal(Math.max(0, total));
+  }, [quantity, pricePerUnit, discountPerUnit, discountTotal, taxAmount, breakdownOpen]);
 
   // Resolve currently selected category and subcategories
   const selectedCategory = categories.find(c => c.id === Number(categoryId));
@@ -190,12 +219,18 @@ export default function TransactionForm({ user, categories, branches }: Transact
           quantity,
           unit: unit.trim(),
           pricePerUnit,
+          // Breakdown fields — only include if the panel was open and values are non-zero
+          discountPerUnit: breakdownOpen && discountPerUnit > 0 ? discountPerUnit : undefined,
+          discountTotal: breakdownOpen && discountTotal > 0 ? discountTotal : undefined,
+          taxAmount: breakdownOpen && taxAmount > 0 ? taxAmount : undefined,
+          taxNote: breakdownOpen && taxNote.trim() ? taxNote.trim() : undefined,
           paymentMethod: paymentMethod as PaymentMethod,
           vendor: vendor.trim() || undefined,
           receiptPath: receiptPath || undefined,
           notes: notes.trim() || undefined,
           customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
           beritaAcara: beritaAcara.trim() || undefined,
+          ongoingPaymentId: initialOngoingPayment?.id,
         };
 
         if (user.role === 'SUPERADMIN') {
@@ -230,6 +265,15 @@ export default function TransactionForm({ user, categories, branches }: Transact
     setCustomFields({});
     setSubCategoryId('');
     setBeritaAcara('');
+    // Reset breakdown panel
+    setBreakdownOpen(false);
+    setDiscountPerUnit(0);
+    setDiscountPerUnitDisplay('');
+    setDiscountTotal(0);
+    setDiscountTotalDisplay('');
+    setTaxAmount(0);
+    setTaxAmountDisplay('');
+    setTaxNote('');
     handleRemoveReceipt();
   };
 
@@ -239,6 +283,21 @@ export default function TransactionForm({ user, categories, branches }: Transact
         <h2>Catat Transaksi</h2>
         <p className="text-muted">Mencatat pengeluaran operasional General Affairs untuk audit cabang.</p>
       </header>
+      
+      {/* Banner for OngoingPayment / Recurring Bill pre-fill */}
+      {initialOngoingPayment && (
+        <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: 'var(--space-4)', borderRadius: 'var(--radius-lg)', marginBottom: 'var(--space-2)', display: 'flex', gap: 'var(--space-3)' }}>
+          <AlertCircle size={20} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+          <div>
+            <h4 style={{ margin: '0 0 var(--space-1) 0', color: 'var(--color-primary)', fontSize: 'var(--text-sm)' }}>
+              Pembayaran Tagihan Berjalan
+            </h4>
+            <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+              Formulir ini telah diisi otomatis berdasarkan tagihan: <strong>{initialOngoingPayment.description}</strong>. Menyimpan transaksi ini akan otomatis menandai tagihan sebagai lunas.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Success alert with option to reset or view list (Enterprise UX) */}
       {formSuccess ? (
@@ -512,12 +571,192 @@ export default function TransactionForm({ user, categories, branches }: Transact
           <div className={styles.totalCard}>
             <div className={styles.totalLabelBlock}>
               <span className={styles.totalLabel}>Estimasi Total Pengeluaran</span>
-              <span className={styles.totalSub}>Hasil kali otomatis Kuantitas &times; Harga Satuan</span>
+              <span className={styles.totalSub}>
+                {breakdownOpen
+                  ? 'Subtotal setelah diskon & pajak'
+                  : 'Hasil kali otomatis Kuantitas × Harga Satuan'}
+              </span>
             </div>
             <div className={styles.totalValue} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
               <Calculator size={20} style={{ opacity: 0.6 }} />
-              <span>{formatRupiah(totalAmount)}</span>
+              <span>{formatRupiah(computedTotal)}</span>
             </div>
+          </div>
+
+          {/* ── Rincian Harga (Diskon & Pajak) ── collapsible panel */}
+          <div style={{
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            marginBottom: 'var(--space-4)',
+          }}>
+            {/* Toggle header */}
+            <button
+              type="button"
+              id="breakdown-toggle"
+              onClick={() => setBreakdownOpen(o => !o)}
+              disabled={isPending}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: 'var(--space-3) var(--space-4)',
+                background: breakdownOpen ? 'rgba(59,130,246,0.04)' : 'var(--color-surface)',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--color-text)',
+                fontWeight: 600,
+                fontSize: 'var(--text-sm)',
+                transition: 'background 200ms',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--color-primary)' }}>
+                <Tag size={15} />
+                Rincian Harga — Diskon &amp; Pajak (Opsional)
+              </span>
+              {breakdownOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+
+            {/* Expanded content */}
+            {breakdownOpen && (
+              <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', borderTop: '1px solid var(--color-border)' }}>
+                <div className={styles.formGrid}>
+                  {/* Discount per unit */}
+                  <div className={styles.formGroup}>
+                    <label htmlFor="discountPerUnit" className={styles.label}>
+                      Diskon per Satuan (Rupiah)
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        id="discountPerUnit"
+                        type="text"
+                        inputMode="numeric"
+                        className={styles.input}
+                        style={{ paddingLeft: 'var(--space-10)' }}
+                        placeholder="0"
+                        value={discountPerUnitDisplay}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9]/g, '');
+                          const num = raw ? Number(raw) : 0;
+                          setDiscountPerUnit(num);
+                          setDiscountPerUnitDisplay(raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.'));
+                        }}
+                        disabled={isPending}
+                      />
+                      <span style={{ position: 'absolute', left: 'var(--space-4)', top: '50%', transform: 'translateY(-50%)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-muted)' }}>Rp</span>
+                    </div>
+                  </div>
+
+                  {/* Discount total bill */}
+                  <div className={styles.formGroup}>
+                    <label htmlFor="discountTotal" className={styles.label}>
+                      Diskon Total Tagihan (Rupiah)
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        id="discountTotal"
+                        type="text"
+                        inputMode="numeric"
+                        className={styles.input}
+                        style={{ paddingLeft: 'var(--space-10)' }}
+                        placeholder="0"
+                        value={discountTotalDisplay}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9]/g, '');
+                          const num = raw ? Number(raw) : 0;
+                          setDiscountTotal(num);
+                          setDiscountTotalDisplay(raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.'));
+                        }}
+                        disabled={isPending}
+                      />
+                      <span style={{ position: 'absolute', left: 'var(--space-4)', top: '50%', transform: 'translateY(-50%)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-muted)' }}>Rp</span>
+                    </div>
+                  </div>
+
+                  {/* Tax amount */}
+                  <div className={styles.formGroup}>
+                    <label htmlFor="taxAmount" className={styles.label}>
+                      Pajak (Rupiah)
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        id="taxAmount"
+                        type="text"
+                        inputMode="numeric"
+                        className={styles.input}
+                        style={{ paddingLeft: 'var(--space-10)' }}
+                        placeholder="0"
+                        value={taxAmountDisplay}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9]/g, '');
+                          const num = raw ? Number(raw) : 0;
+                          setTaxAmount(num);
+                          setTaxAmountDisplay(raw.replace(/\B(?=(\d{3})+(?!\d))/g, '.'));
+                        }}
+                        disabled={isPending}
+                      />
+                      <span style={{ position: 'absolute', left: 'var(--space-4)', top: '50%', transform: 'translateY(-50%)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-muted)' }}>Rp</span>
+                    </div>
+                  </div>
+
+                  {/* Tax note */}
+                  <div className={styles.formGroup}>
+                    <label htmlFor="taxNote" className={styles.label}>
+                      Keterangan Pajak
+                    </label>
+                    <input
+                      id="taxNote"
+                      type="text"
+                      className={styles.input}
+                      placeholder="Contoh: PPN 12%, PPh 23%"
+                      value={taxNote}
+                      onChange={(e) => setTaxNote(e.target.value)}
+                      disabled={isPending}
+                    />
+                  </div>
+                </div>
+
+                {/* Live breakdown summary */}
+                <div style={{
+                  background: 'var(--color-bg)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 'var(--space-3) var(--space-4)',
+                  fontSize: 'var(--text-sm)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-2)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-text-muted)' }}>
+                    <span>Subtotal ({quantity} × {formatRupiah(pricePerUnit)})</span>
+                    <span>{formatRupiah(subtotal)}</span>
+                  </div>
+                  {discountPerUnit > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-danger)' }}>
+                      <span>Diskon per satuan (×{quantity})</span>
+                      <span>−{formatRupiah(discountPerUnit * quantity)}</span>
+                    </div>
+                  )}
+                  {discountTotal > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-danger)' }}>
+                      <span>Diskon total tagihan</span>
+                      <span>−{formatRupiah(discountTotal)}</span>
+                    </div>
+                  )}
+                  {taxAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-success)' }}>
+                      <span>Pajak{taxNote ? ` (${taxNote})` : ''}</span>
+                      <span>+{formatRupiah(taxAmount)}</span>
+                    </div>
+                  )}
+                  <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-2)', display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--color-text)', fontSize: 'var(--text-base)' }}>
+                    <span>Total</span>
+                    <span style={{ color: 'var(--color-primary)' }}>{formatRupiah(computedTotal)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <h3 className={styles.sectionTitle}>Bukti Pembayaran (Kuitansi / Nota)</h3>
@@ -656,9 +895,19 @@ export default function TransactionForm({ user, categories, branches }: Transact
 
                 <div className={modalStyles.item} style={{ gridColumn: 'span 2' }}>
                   <span className={modalStyles.label}>Total Pengeluaran</span>
-                  <span className={modalStyles.valueHighlight} style={{ color: 'var(--color-primary)', fontSize: 'var(--text-lg)', fontWeight: 800 }}>
-                    {formatRupiah(quantity * pricePerUnit)}
-                  </span>
+                  {breakdownOpen && (discountPerUnit > 0 || discountTotal > 0 || taxAmount > 0) ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', alignItems: 'flex-end' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Subtotal: {formatRupiah(subtotal)}</span>
+                      {discountPerUnit > 0 && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }}>Diskon/unit: −{formatRupiah(discountPerUnit * quantity)}</span>}
+                      {discountTotal > 0 && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }}>Diskon total: −{formatRupiah(discountTotal)}</span>}
+                      {taxAmount > 0 && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-success)' }}>Pajak{taxNote ? ` (${taxNote})` : ''}: +{formatRupiah(taxAmount)}</span>}
+                      <span className={modalStyles.valueHighlight} style={{ color: 'var(--color-primary)', fontSize: 'var(--text-lg)', fontWeight: 800 }}>{formatRupiah(computedTotal)}</span>
+                    </div>
+                  ) : (
+                    <span className={modalStyles.valueHighlight} style={{ color: 'var(--color-primary)', fontSize: 'var(--text-lg)', fontWeight: 800 }}>
+                      {formatRupiah(computedTotal)}
+                    </span>
+                  )}
                 </div>
 
                 <div className={modalStyles.item} style={{ gridColumn: 'span 2' }}>

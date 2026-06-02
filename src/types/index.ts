@@ -60,12 +60,18 @@ export interface TransactionFormData {
   quantity: number;
   unit: string;
   pricePerUnit: number;
+  // Price breakdown fields (all optional — null/undefined = not applicable)
+  discountPerUnit?: number;
+  discountTotal?: number;
+  taxAmount?: number;
+  taxNote?: string;
   paymentMethod: PaymentMethod;
   vendor?: string;
   receiptPath?: string;
   notes?: string;
   customFields?: Record<string, string | number>;
   beritaAcara?: string;
+  ongoingPaymentId?: number;
 }
 
 // ============================================================

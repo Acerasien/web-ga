@@ -4,7 +4,7 @@ import { useState, useRef, useTransition } from 'react';
 import { X, UploadCloud, AlertCircle, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { realizeOngoingPayment } from '@/lib/actions/ongoing';
 import { formatRupiah } from '@/lib/formatters';
-import { PaymentMethod } from '@prisma/client';
+import type { PaymentMethod } from '@prisma/client';
 import styles from './modal.module.css';
 
 interface OngoingRealizeModalProps {
@@ -30,7 +30,7 @@ export default function OngoingRealizeModal({
   // Form states
   const [isMoneyEnough, setIsMoneyEnough] = useState<boolean>(true);
   const [actualAmount, setActualAmount] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [vendor, setVendor] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [beritaAcara, setBeritaAcara] = useState<string>('');
@@ -163,7 +163,7 @@ export default function OngoingRealizeModal({
   const handleReset = () => {
     setIsMoneyEnough(true);
     setActualAmount('');
-    setPaymentMethod(PaymentMethod.CASH);
+    setPaymentMethod('CASH');
     setVendor('');
     setNotes('');
     setBeritaAcara('');

@@ -2,30 +2,32 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  Wallet, 
-  Receipt, 
-  CreditCard, 
-  Activity, 
-  ArrowRight, 
-  PlusCircle, 
-  Search, 
-  Clock, 
-  CheckCircle2, 
+import {
+  Wallet,
+  Receipt,
+  CreditCard,
+  Activity,
+  ArrowRight,
+  PlusCircle,
+  Search,
+  Clock,
+  CheckCircle2,
   Coins,
   TrendingUp,
-  PieChart as PieIcon
+  PieChart as PieIcon,
+  Bell,
+  CalendarClock,
 } from 'lucide-react';
-import { 
-  ResponsiveContainer, 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  PieChart as RechartsPieChart, 
-  Pie, 
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart as RechartsPieChart,
+  Pie,
   Cell
 } from 'recharts';
 import Link from 'next/link';
@@ -57,8 +59,8 @@ const CHART_COLORS = [
   '#CBD5E1'  // Slate fallbacks
 ];
 
-export default function DashboardClient({ 
-  user, 
+export default function DashboardClient({
+  user,
   initialStats,
   initialChartData,
   branches,
@@ -66,7 +68,7 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   const router = useRouter();
   const isAuthorized = user.role === 'SUPERADMIN' || user.role === 'ADMIN';
-  
+
   // Modal states for interactive row previews
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithRelations | null>(null);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
@@ -95,15 +97,15 @@ export default function DashboardClient({
     },
     ...(isAuthorized
       ? [
-          {
-            label: 'Kas Berjalan',
-            value: formatRupiah(initialStats.activePanjarExpense),
-            icon: Coins,
-            colorClass: 'warning',
-            badgeText: 'Panjar Belum Realisasi',
-            badgeClass: 'badge-warning',
-          },
-        ]
+        {
+          label: 'Kas Berjalan',
+          value: formatRupiah(initialStats.activePanjarExpense),
+          icon: Coins,
+          colorClass: 'warning',
+          badgeText: 'Panjar Belum Realisasi',
+          badgeClass: 'badge-warning',
+        },
+      ]
       : []),
     {
       label: 'Jumlah Transaksi',
@@ -141,7 +143,7 @@ export default function DashboardClient({
             <strong className="text-primary">{user.branchName || 'HQ (Semua Cabang)'}</strong>
           </p>
         </div>
-        
+
         {/* Dynamic Branch Dropdown Selector + Navigation Actions */}
         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
           {user.role === 'SUPERADMIN' && branches && branches.length > 0 && (
@@ -179,9 +181,9 @@ export default function DashboardClient({
           )}
 
           {user.role !== 'VIEWER' && (
-            <Link 
-              href="/transaksi/input" 
-              className="btn btn-primary" 
+            <Link
+              href="/transaksi/input"
+              className="btn btn-primary"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}
             >
               <PlusCircle size={18} />
@@ -218,7 +220,100 @@ export default function DashboardClient({
         })}
       </section>
 
-      {/* Main Activity Info Panel & Active Checklist Feed */}
+      {/* ── Tagihan Jatuh Tempo Panel ── */}
+      {isAuthorized && initialStats.dueRecurringPayments.length > 0 && (
+        <section className="card" style={{ overflow: 'hidden' }}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="card-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--color-danger)' }}>
+              <Bell size={18} />
+              <span>Tagihan Jatuh Tempo</span>
+            </h3>
+            <span className="badge" style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: 'var(--color-danger)', fontWeight: 700, fontSize: 'var(--text-xs)' }}>
+              {initialStats.dueRecurringPayments.length} tagihan
+            </span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
+              <thead>
+                <tr style={{ backgroundColor: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', textAlign: 'left' }}>
+                  <th style={{ padding: '10px 16px', color: 'var(--color-text-muted)', fontWeight: 700 }}>Tagihan</th>
+                  <th style={{ padding: '10px 16px', color: 'var(--color-text-muted)', fontWeight: 700 }}>Kategori</th>
+                  <th style={{ padding: '10px 16px', color: 'var(--color-text-muted)', fontWeight: 700 }}>Frekuensi</th>
+                  <th style={{ padding: '10px 16px', color: 'var(--color-text-muted)', fontWeight: 700 }}>Status</th>
+                  <th style={{ padding: '10px 16px', color: 'var(--color-text-muted)', fontWeight: 700, textAlign: 'right' }}>Jumlah</th>
+                  <th style={{ padding: '10px 16px', color: 'var(--color-text-muted)', fontWeight: 700, textAlign: 'center' }}>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {initialStats.dueRecurringPayments.map((bill) => {
+                  const freqLabel = bill.frequency === 'MONTHLY' ? 'Bulanan' : bill.frequency === 'QUARTERLY' ? 'Kuartalan' : 'Tahunan';
+                  
+                  // Calculate days difference
+                  const due = new Date(bill.dueDate);
+                  due.setHours(0, 0, 0, 0);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+
+                  const diffTime = due.getTime() - today.getTime();
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                  let statusText = '';
+                  let statusStyle: React.CSSProperties = {};
+                  let iconColor = 'var(--color-danger)';
+
+                  if (diffDays < 0) {
+                    statusText = `Terlambat ${Math.abs(diffDays)} hari`;
+                    statusStyle = { backgroundColor: 'rgba(239, 68, 68, 0.08)', color: '#b91c1c', border: '1px solid rgba(239, 68, 68, 0.15)', fontSize: '10px', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, display: 'inline-block' };
+                  } else if (diffDays === 0) {
+                    statusText = 'Jatuh Tempo Hari Ini';
+                    statusStyle = { backgroundColor: 'rgba(239, 68, 68, 0.08)', color: '#dc2626', border: '1px solid rgba(239, 68, 68, 0.15)', fontSize: '10px', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, display: 'inline-block' };
+                  } else if (diffDays === 1) {
+                    statusText = 'Jatuh Tempo Besok';
+                    statusStyle = { backgroundColor: 'rgba(249, 115, 22, 0.08)', color: '#ea580c', border: '1px solid rgba(249, 115, 22, 0.15)', fontSize: '10px', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, display: 'inline-block' };
+                    iconColor = '#ea580c';
+                  } else {
+                    statusText = `Jatuh tempo H-${diffDays}`;
+                    statusStyle = { backgroundColor: 'rgba(234, 179, 8, 0.08)', color: '#a16207', border: '1px solid rgba(234, 179, 8, 0.15)', fontSize: '10px', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, display: 'inline-block' };
+                    iconColor = '#a16207';
+                  }
+
+                  return (
+                    <tr key={bill.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '12px 16px', fontWeight: 600 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                          <CalendarClock size={14} style={{ color: iconColor, flexShrink: 0 }} />
+                          <span>{bill.description}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--color-text-muted)' }}>{bill.category.name}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span className="badge badge-info" style={{ fontSize: '10px' }}>{freqLabel}</span>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={statusStyle}>{statusText}</span>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontWeight: 700, textAlign: 'right', color: bill.amountNeeded > 0 ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
+                        {bill.amountNeeded > 0 ? formatRupiah(bill.amountNeeded) : 'Jumlah Variabel'}
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                        <Link
+                          href={`/transaksi/input?fromRecurring=${bill.id}`}
+                          className="btn btn-primary"
+                          style={{ padding: '6px 14px', fontSize: 'var(--text-xs)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <PlusCircle size={12} />
+                          <span>Bayar Sekarang</span>
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       <section className={isAuthorized ? 'dashboard-grid' : ''} style={!isAuthorized ? { display: 'grid', gridTemplateColumns: '1fr', gap: 'var(--space-6)' } : undefined}>
         <div className="card dashboard-main" style={{ minWidth: 0, overflow: 'hidden' }}>
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -226,9 +321,9 @@ export default function DashboardClient({
               <Activity size={18} style={{ color: 'var(--color-primary)' }} />
               <span>Aktivitas Terkini</span>
             </h3>
-            <Link 
-              href="/transaksi/riwayat" 
-              className="text-primary" 
+            <Link
+              href="/transaksi/riwayat"
+              className="text-primary"
               style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
             >
               <span>Semua Riwayat</span>
@@ -263,8 +358,8 @@ export default function DashboardClient({
                 </thead>
                 <tbody>
                   {initialStats.recentTransactions.map((tx) => (
-                    <tr 
-                      key={tx.id} 
+                    <tr
+                      key={tx.id}
                       style={{ borderBottom: '1px solid var(--color-border)', cursor: 'pointer', transition: 'background-color var(--transition-fast)' }}
                       onClick={() => handleRowClick(tx)}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.01)'; }}
@@ -294,8 +389,8 @@ export default function DashboardClient({
                         )}
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                        <button 
-                          className="btn btn-secondary" 
+                        <button
+                          className="btn btn-secondary"
                           onClick={() => handleRowClick(tx)}
                           style={{ padding: '4px 10px', fontSize: 'var(--text-xs)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         >
@@ -322,7 +417,7 @@ export default function DashboardClient({
                 {initialStats.activeOngoingPayments.length} Aktif
               </span>
             </div>
-            
+
             <p className="text-muted" style={{ fontSize: 'var(--text-xs)', margin: '0 0 var(--space-1) 0', lineHeight: 1.4 }}>
               Daftar permintaan pembayaran berjalan yang memerlukan perhatian atau tindakan realisasi segera.
             </p>
@@ -340,7 +435,7 @@ export default function DashboardClient({
             ) : (
               <div className="checklist-scrollable-container" style={{ maxHeight: '420px' }}>
                 {initialStats.activeOngoingPayments.map((p) => (
-                  <Link 
+                  <Link
                     key={p.id}
                     href="/ongoing/list"
                     className="checklist-card"
@@ -350,36 +445,36 @@ export default function DashboardClient({
                         <span className="badge badge-primary" style={{ fontSize: '10px', padding: '2px 6px' }}>
                           {p.branch.name}
                         </span>
-                        <span className="badge" style={{ 
-                          fontSize: '10px', 
+                        <span className="badge" style={{
+                          fontSize: '10px',
                           padding: '2px 6px',
-                          backgroundColor: 'rgba(96, 165, 250, 0.1)', 
+                          backgroundColor: 'rgba(96, 165, 250, 0.1)',
                           color: '#2563EB',
                           fontWeight: 600
                         }}>
                           {p.category.name}
                         </span>
                       </div>
-                      
+
                       {p.status === 'BELUM_DIBAYAR' ? (
-                        <span className="badge" style={{ 
-                          fontSize: '10px', 
+                        <span className="badge" style={{
+                          fontSize: '10px',
                           padding: '2px 6px',
-                          backgroundColor: 'rgba(245, 158, 11, 0.1)', 
-                          color: '#D97706', 
+                          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                          color: '#D97706',
                           border: '1px solid rgba(245, 158, 11, 0.2)',
-                          fontWeight: 700 
+                          fontWeight: 700
                         }}>
                           Belum Dibayar
                         </span>
                       ) : (
-                        <span className="badge" style={{ 
-                          fontSize: '10px', 
+                        <span className="badge" style={{
+                          fontSize: '10px',
                           padding: '2px 6px',
-                          backgroundColor: 'rgba(59, 130, 246, 0.1)', 
-                          color: 'var(--color-primary-hover)', 
+                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                          color: 'var(--color-primary-hover)',
                           border: '1px solid rgba(59, 130, 246, 0.2)',
-                          fontWeight: 700 
+                          fontWeight: 700
                         }}>
                           Sudah Dibayar
                         </span>
@@ -388,10 +483,10 @@ export default function DashboardClient({
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-1)' }}>
                       <div style={{ flex: 1, minWidth: 0, paddingRight: 'var(--space-2)' }}>
-                        <p style={{ 
-                          fontWeight: 600, 
-                          fontSize: 'var(--text-xs)', 
-                          margin: 0, 
+                        <p style={{
+                          fontWeight: 600,
+                          fontSize: 'var(--text-xs)',
+                          margin: 0,
                           color: 'var(--color-text)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -399,20 +494,20 @@ export default function DashboardClient({
                         }}>
                           {p.description}
                         </p>
-                        <p style={{ 
-                          fontSize: '10px', 
-                          color: 'var(--color-text-muted)', 
-                          margin: '2px 0 0 0' 
+                        <p style={{
+                          fontSize: '10px',
+                          color: 'var(--color-text-muted)',
+                          margin: '2px 0 0 0'
                         }}>
                           Oleh {p.user.fullName} &bull; {new Date(p.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
                         </p>
                       </div>
-                      
+
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                        <span style={{ 
-                          fontWeight: 700, 
-                          fontSize: 'var(--text-xs)', 
-                          color: 'var(--color-primary)' 
+                        <span style={{
+                          fontWeight: 700,
+                          fontSize: 'var(--text-xs)',
+                          color: 'var(--color-primary)'
                         }}>
                           {formatRupiah(p.amountNeeded)}
                         </span>
@@ -429,7 +524,7 @@ export default function DashboardClient({
 
       {/* Dashboard Visual Charts Section (Priority 8 - Charts & Data) */}
       {mounted && (
-        <section 
+        <section
           style={{
             display: 'grid',
             gridTemplateColumns: '1fr',
@@ -438,7 +533,7 @@ export default function DashboardClient({
           }}
         >
           {initialChartData.totalSpending === 0 ? (
-            <div 
+            <div
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -463,7 +558,7 @@ export default function DashboardClient({
           ) : (
             <>
               {/* Top Row: Spending Trend & Category share */}
-              <div 
+              <div
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
@@ -488,23 +583,23 @@ export default function DashboardClient({
                         <LineChart data={initialChartData.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
                           <XAxis dataKey="label" stroke="#94A3B8" fontSize={10} tickLine={false} />
-                          <YAxis 
-                            stroke="#94A3B8" 
-                            fontSize={10} 
-                            tickLine={false} 
+                          <YAxis
+                            stroke="#94A3B8"
+                            fontSize={10}
+                            tickLine={false}
                             tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}Jt` : val >= 1000 ? `${(val / 1000).toFixed(0)}rb` : val}
                           />
-                          <Tooltip 
+                          <Tooltip
                             formatter={(value) => [formatRupiah(Number(value)), 'Total Biaya']}
                             contentStyle={{ background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '11px', boxShadow: 'var(--shadow-md)' }}
                           />
-                          <Line 
-                            type="monotone" 
-                            dataKey="total" 
-                            stroke="var(--color-primary)" 
-                            strokeWidth={3} 
+                          <Line
+                            type="monotone"
+                            dataKey="total"
+                            stroke="var(--color-primary)"
+                            strokeWidth={3}
                             dot={{ r: 3, stroke: 'var(--color-primary)', strokeWidth: 2, fill: '#FFF' }}
-                            activeDot={{ r: 5 }} 
+                            activeDot={{ r: 5 }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
@@ -522,7 +617,7 @@ export default function DashboardClient({
                     <PieIcon size={16} style={{ color: 'var(--color-primary)' }} />
                     <span>Proporsi Kategori Pengeluaran</span>
                   </h3>
-                  
+
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '140px', width: '100%', position: 'relative' }}>
                     {mounted ? (
                       <>
@@ -548,8 +643,8 @@ export default function DashboardClient({
                         <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                           <span style={{ fontSize: '9px', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total MTD</span>
                           <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text)' }}>
-                            {initialChartData.totalSpending >= 1000000 
-                              ? `${(initialChartData.totalSpending / 1000000).toFixed(1)} Jt` 
+                            {initialChartData.totalSpending >= 1000000
+                              ? `${(initialChartData.totalSpending / 1000000).toFixed(1)} Jt`
                               : formatRupiah(initialChartData.totalSpending)}
                           </span>
                         </div>
@@ -562,12 +657,12 @@ export default function DashboardClient({
                   </div>
 
                   {/* Dynamic scrollable custom legend list */}
-                  <div 
-                    style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', 
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
                       gap: 'var(--space-2)',
-                      maxHeight: '65px', 
+                      maxHeight: '65px',
                       overflowY: 'auto',
                       paddingRight: '4px'
                     }}

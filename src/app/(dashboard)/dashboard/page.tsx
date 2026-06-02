@@ -50,6 +50,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         recentTransactions: [],
         activeOngoingPayments: [],
         activePanjarExpense: 0,
+        pendingRecurringCount: 0,
+        dueRecurringPayments: [],
       };
 
   const initialChartData = chartResponse.success && chartResponse.data

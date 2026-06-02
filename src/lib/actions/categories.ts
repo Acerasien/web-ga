@@ -29,7 +29,7 @@ export async function getCategoriesWithSub(): Promise<ApiResponse<CategoryWithSu
 
     return {
       success: true,
-      data: categories as CategoryWithSub[],
+      data: JSON.parse(JSON.stringify(categories)) as CategoryWithSub[],
     };
   } catch (error) {
     console.error('Error fetching categories with sub:', error);
@@ -54,7 +54,7 @@ export async function getBranches(): Promise<ApiResponse<Branch[]>> {
 
     return {
       success: true,
-      data: branches,
+      data: JSON.parse(JSON.stringify(branches)),
     };
   } catch (error) {
     console.error('Error fetching branches:', error);

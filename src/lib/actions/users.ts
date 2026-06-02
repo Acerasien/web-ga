@@ -504,6 +504,9 @@ export async function getUserTransactionHistory(
       quantity: Number(t.quantity),
       pricePerUnit: Number(t.pricePerUnit),
       totalAmount: Number(t.totalAmount),
+      discountPerUnit: t.discountPerUnit ? Number(t.discountPerUnit) : null,
+      discountTotal: t.discountTotal ? Number(t.discountTotal) : null,
+      taxAmount: t.taxAmount ? Number(t.taxAmount) : null,
     }));
 
     return {

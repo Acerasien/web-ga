@@ -46,6 +46,10 @@ export async function createTransaction(
       quantity,
       unit,
       pricePerUnit,
+      discountPerUnit,
+      discountTotal,
+      taxAmount,
+      taxNote,
       paymentMethod,
       vendor,
       receiptPath,
@@ -83,10 +87,19 @@ export async function createTransaction(
       targetBranchId = user.branchId;
     }
 
-    // Compute double-precision decimal multiplication safely
+    // Compute total using full breakdown formula:
+    // total = (qty × price) - (discountPerUnit × qty) - discountTotal + taxAmount
     const qty = new Prisma.Decimal(quantity);
     const price = new Prisma.Decimal(pricePerUnit);
-    const totalAmount = qty.mul(price);
+    let totalAmount = qty.mul(price);
+    const discountPerUnitDecimal = discountPerUnit ? new Prisma.Decimal(discountPerUnit) : null;
+    const discountTotalDecimal = discountTotal ? new Prisma.Decimal(discountTotal) : null;
+    const taxAmountDecimal = taxAmount ? new Prisma.Decimal(taxAmount) : null;
+    if (discountPerUnitDecimal) totalAmount = totalAmount.sub(discountPerUnitDecimal.mul(qty));
+    if (discountTotalDecimal) totalAmount = totalAmount.sub(discountTotalDecimal);
+    if (taxAmountDecimal) totalAmount = totalAmount.add(taxAmountDecimal);
+    // Guard: total cannot be negative
+    if (totalAmount.lessThan(0)) totalAmount = new Prisma.Decimal(0);
 
     // Save transaction inside database with optional custom Berita Acara (BA)
     const txDate = new Date(transactionDate);
@@ -111,26 +124,94 @@ export async function createTransaction(
     }
 
     try {
-      await prisma.transaction.create({
-        data: {
-          branchId: targetBranchId,
-          userId: user.id,
-          categoryId: Number(categoryId),
-          subCategoryId: subCategoryId ? Number(subCategoryId) : null,
-          transactionDate: txDate,
-          description: description.trim(),
-          quantity: qty,
-          unit: unit.trim(),
-          pricePerUnit: price,
-          totalAmount,
-          paymentMethod,
-          vendor: vendor?.trim() || null,
-          receiptPath: receiptPath || null,
-          notes: notes?.trim() || null,
-          customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,
-          beritaAcara: finalBeritaAcara,
-        },
-      });
+      if (data.ongoingPaymentId) {
+        // Find ongoing payment first
+        const ongoingPayment = await prisma.ongoingPayment.findUnique({
+          where: { id: data.ongoingPaymentId }
+        });
+        
+        if (!ongoingPayment) {
+          return {
+            success: false,
+            error: 'Tagihan berjalan yang dimaksud tidak ditemukan.',
+          };
+        }
+        
+        if (ongoingPayment.transactionId || ongoingPayment.status === 'SUDAH_DIBAYAR') {
+           return {
+            success: false,
+            error: 'Tagihan berjalan ini sudah dibayar sebelumnya.',
+          };
+        }
+
+        // Use interactive transaction to guarantee consistency
+        await prisma.$transaction(async (tx) => {
+          const newTx = await tx.transaction.create({
+            data: {
+              branchId: targetBranchId,
+              userId: user.id,
+              categoryId: Number(categoryId),
+              subCategoryId: subCategoryId ? Number(subCategoryId) : null,
+              transactionDate: txDate,
+              description: description.trim(),
+              quantity: qty,
+              unit: unit.trim(),
+              pricePerUnit: price,
+              discountPerUnit: discountPerUnitDecimal,
+              discountTotal: discountTotalDecimal,
+              taxAmount: taxAmountDecimal,
+              taxNote: taxNote?.trim() || null,
+              totalAmount,
+              paymentMethod,
+              vendor: vendor?.trim() || null,
+              receiptPath: receiptPath || null,
+              notes: notes?.trim() || null,
+              customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,
+              beritaAcara: finalBeritaAcara,
+            },
+          });
+          
+          // Poka-Yoke: Recurring bill payments are fully realized immediately upon transaction input.
+          // Standard ongoing payments (if any) transition to SUDAH_DIBAYAR and await realization.
+          const isRecurringSpawn = ongoingPayment.recurringBillId !== null;
+
+          await tx.ongoingPayment.update({
+            where: { id: ongoingPayment.id },
+            data: {
+              status: isRecurringSpawn ? 'TER_REALISASI' : 'SUDAH_DIBAYAR',
+              transactionId: newTx.id,
+              actualAmount: newTx.totalAmount,
+              finalReceiptPath: receiptPath || null,
+              ...(isRecurringSpawn ? { isMoneyEnough: true } : {}),
+            }
+          });
+        });
+      } else {
+        await prisma.transaction.create({
+          data: {
+            branchId: targetBranchId,
+            userId: user.id,
+            categoryId: Number(categoryId),
+            subCategoryId: subCategoryId ? Number(subCategoryId) : null,
+            transactionDate: txDate,
+            description: description.trim(),
+            quantity: qty,
+            unit: unit.trim(),
+            pricePerUnit: price,
+            discountPerUnit: discountPerUnitDecimal,
+            discountTotal: discountTotalDecimal,
+            taxAmount: taxAmountDecimal,
+            taxNote: taxNote?.trim() || null,
+            totalAmount,
+            paymentMethod,
+            vendor: vendor?.trim() || null,
+            receiptPath: receiptPath || null,
+            notes: notes?.trim() || null,
+            customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,
+            beritaAcara: finalBeritaAcara,
+          },
+        });
+      }
     } catch (error) {
       console.error('Error during transaction create:', error);
       return {
@@ -142,6 +223,7 @@ export async function createTransaction(
     // Clear router cache tags to trigger live layout refreshes
     revalidatePath('/dashboard');
     revalidatePath('/transaksi/riwayat');
+    revalidatePath('/ongoing/list');
 
     return {
       success: true,
@@ -175,10 +257,13 @@ export interface TransactionFilter {
   sortOrder?: 'asc' | 'desc';
 }
 
-export interface TransactionWithRelations extends Omit<Transaction, 'quantity' | 'pricePerUnit' | 'totalAmount'> {
+export interface TransactionWithRelations extends Omit<Transaction, 'quantity' | 'pricePerUnit' | 'totalAmount' | 'discountPerUnit' | 'discountTotal' | 'taxAmount'> {
   quantity: number;
   pricePerUnit: number;
   totalAmount: number;
+  discountPerUnit: number | null;
+  discountTotal: number | null;
+  taxAmount: number | null;
   category: Category;
   subCategory: SubCategory | null;
   branch: Branch;
@@ -332,11 +417,17 @@ export async function getTransactions(
 
     const totalPages = Math.ceil(totalCount / limit);
 
-    const serializedTransactions: TransactionWithRelations[] = transactions.map((t) => ({
+    // Deep clone to strip Prisma proxy objects which crash Next.js RSC streaming
+    const plainTransactions = JSON.parse(JSON.stringify(transactions));
+
+    const serializedTransactions: TransactionWithRelations[] = plainTransactions.map((t: any) => ({
       ...t,
       quantity: Number(t.quantity),
       pricePerUnit: Number(t.pricePerUnit),
       totalAmount: Number(t.totalAmount),
+      discountPerUnit: t.discountPerUnit ? Number(t.discountPerUnit) : null,
+      discountTotal: t.discountTotal ? Number(t.discountTotal) : null,
+      taxAmount: t.taxAmount ? Number(t.taxAmount) : null,
     }));
 
     return {
@@ -455,6 +546,9 @@ export async function getTransactionById(
       quantity: Number(transaction.quantity),
       pricePerUnit: Number(transaction.pricePerUnit),
       totalAmount: Number(transaction.totalAmount),
+      discountPerUnit: transaction.discountPerUnit ? Number(transaction.discountPerUnit) : null,
+      discountTotal: transaction.discountTotal ? Number(transaction.discountTotal) : null,
+      taxAmount: transaction.taxAmount ? Number(transaction.taxAmount) : null,
     };
 
     return {

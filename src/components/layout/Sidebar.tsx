@@ -16,6 +16,7 @@ import {
   Upload,
   LogOut,
   Clock,
+  CalendarClock,
 } from 'lucide-react';
 import type { AuthUser, NavItem } from '@/types';
 import styles from './Sidebar.module.css';
@@ -27,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Daftar Pembayaran', href: '/ongoing/list', icon: 'Clock', roles: ['SUPERADMIN', 'ADMIN'] },
   { label: 'Input Pembayaran', href: '/ongoing/input', icon: 'PlusCircle', roles: ['SUPERADMIN', 'ADMIN'] },
   { label: 'Riwayat Pembayaran', href: '/ongoing/riwayat', icon: 'ClipboardList', roles: ['SUPERADMIN', 'ADMIN'] },
+  { label: 'Tagihan Rutin', href: '/admin/tagihan-rutin', icon: 'CalendarClock', roles: ['SUPERADMIN', 'ADMIN'] },
   { label: 'Import Data', href: '/transaksi/import', icon: 'Upload', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY'] },
   { label: 'Laporan', href: '/laporan', icon: 'BarChart3', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY', 'VIEWER'] },
   { label: 'Pengguna', href: '/admin/users', icon: 'Users', roles: ['SUPERADMIN'] },
@@ -44,6 +46,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Settings,
   Upload,
   Clock,
+  CalendarClock,
 };
 
 interface SidebarProps {
@@ -73,8 +76,8 @@ export default function Sidebar({
 
   // Group items: main nav vs ongoing vs admin
   const mainItems = visibleItems.filter((item) => !item.href.startsWith('/admin') && !item.href.startsWith('/ongoing'));
-  const ongoingItems = visibleItems.filter((item) => item.href.startsWith('/ongoing'));
-  const adminItems = visibleItems.filter((item) => item.href.startsWith('/admin'));
+  const ongoingItems = visibleItems.filter((item) => item.href.startsWith('/ongoing') || item.href === '/admin/tagihan-rutin');
+  const adminItems = visibleItems.filter((item) => item.href.startsWith('/admin') && item.href !== '/admin/tagihan-rutin');
 
   return (
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''} ${mobileOpen ? styles.mobileOpen : ''}`}>

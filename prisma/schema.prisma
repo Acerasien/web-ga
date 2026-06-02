@@ -26,6 +26,13 @@ enum PaymentMethod {
   PETTY_CASH
 }
 
+/// Frekuensi tagihan berulang
+enum RecurringBillFrequency {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
 // ============================================================
 // MODELS
 // ============================================================
@@ -41,9 +48,10 @@ model Branch {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  users        User[]
-  transactions Transaction[]
+  users           User[]
+  transactions    Transaction[]
   ongoingPayments OngoingPayment[]
+  recurringBills  RecurringBill[]
 
   @@map("branches")
 }
@@ -61,9 +69,10 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  branch       Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  transactions Transaction[]
+  branch          Branch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  transactions    Transaction[]
   ongoingPayments OngoingPayment[]
+  recurringBills  RecurringBill[]
 
   @@map("users")
 }
@@ -81,9 +90,10 @@ model Category {
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  subCategories SubCategory[]
-  transactions  Transaction[]
+  subCategories   SubCategory[]
+  transactions    Transaction[]
   ongoingPayments OngoingPayment[]
+  recurringBills  RecurringBill[]
 
   @@map("categories")
 }
@@ -114,6 +124,12 @@ model Transaction {
   quantity        Decimal       @db.Decimal(10, 2)
   unit            String        @db.VarChar(20)
   pricePerUnit    Decimal       @map("price_per_unit") @db.Decimal(15, 2)
+  // Breakdown fields (all optional — null means not applicable)
+  discountPerUnit Decimal?      @map("discount_per_unit") @db.Decimal(15, 2)
+  discountTotal   Decimal?      @map("discount_total") @db.Decimal(15, 2)
+  taxAmount       Decimal?      @map("tax_amount") @db.Decimal(15, 2)
+  taxNote         String?       @map("tax_note") @db.VarChar(50)
+  // total_amount = (qty × price_per_unit) - (discount_per_unit × qty) - discount_total + tax_amount
   totalAmount     Decimal       @map("total_amount") @db.Decimal(15, 2)
   paymentMethod   PaymentMethod @map("payment_method")
   vendor          String?       @db.VarChar(100)
@@ -125,10 +141,10 @@ model Transaction {
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  branch      Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  user        User         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  category    Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  subCategory SubCategory? @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  branch         Branch        @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  category       Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subCategory    SubCategory?  @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
   ongoingPayment OngoingPayment?
 
   // Indexes for performance (per database-design skill)
@@ -156,19 +172,51 @@ model OngoingPayment {
   actualAmount       Decimal?       @map("actual_amount") @db.Decimal(15, 2)
   transactionId      Int?           @unique @map("transaction_id")
   frequency          String?        @db.VarChar(20) // e.g. "Monthly", "Yearly", "One-time"
+  // Link to recurring bill template (if this was auto-spawned)
+  recurringBillId    Int?           @map("recurring_bill_id")
   requestDate        DateTime       @default(now()) @map("request_date") @db.Date
   createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
-
   // Relations
-  branch             Branch         @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  category           Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  user               User           @relation(fields: [userId], references: [id], onDelete: Restrict)
-  transaction        Transaction?   @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  branch         Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  category       Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  transaction    Transaction?    @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  recurringBill  RecurringBill?  @relation(fields: [recurringBillId], references: [id], onDelete: SetNull)
 
   // Optimization indexes
   @@index([branchId, status])
   @@index([createdAt(sort: Desc)])
+  @@index([recurringBillId], name: "idx_op_recurring_bill")
   @@map("ongoing_payments")
+}
+
+/// Template tagihan berulang — spawns OngoingPayment setiap siklus
+model RecurringBill {
+  id              Int                    @id @default(autoincrement())
+  branchId        Int                    @map("branch_id")
+  categoryId      Int                    @map("category_id")
+  userId          Int                    @map("user_id")
+  description     String                 @db.VarChar(255)
+  /// Null = variable-amount bill (user enters actual at payment time)
+  amountExpected  Decimal?               @map("amount_expected") @db.Decimal(15, 2)
+  frequency       RecurringBillFrequency
+  nextDueDate     DateTime               @map("next_due_date") @db.Date
+  isActive        Boolean                @default(true) @map("is_active")
+  notes           String?                @db.Text
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime               @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  branch          Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  category        Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  ongoingPayments OngoingPayment[]
+
+  // Indexes
+  @@index([branchId, nextDueDate], name: "idx_rb_branch_due")
+  @@index([isActive, nextDueDate], name: "idx_rb_active_due")
+
+  @@map("recurring_bills")
 }

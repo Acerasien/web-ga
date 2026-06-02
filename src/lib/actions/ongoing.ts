@@ -128,8 +128,11 @@ export async function getOngoingPayments(
       prisma.ongoingPayment.count({ where }),
     ]);
 
+    // Deep clone to strip Prisma proxy objects which crash Next.js RSC streaming
+    const plainPayments = JSON.parse(JSON.stringify(payments));
+
     // Map Prisma Decimal back to standard JS numbers for Client safety
-    const serializedPayments: OngoingPaymentWithRelations[] = payments.map((p) => ({
+    const serializedPayments: OngoingPaymentWithRelations[] = plainPayments.map((p: any) => ({
       ...p,
       amountNeeded: Number(p.amountNeeded),
       actualAmount: p.actualAmount ? Number(p.actualAmount) : null,
