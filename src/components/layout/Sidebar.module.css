@@ -27,24 +27,19 @@
   min-height: 72px;
 }
 
-.brandText {
+.brandLogo {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   min-width: 0;
+  flex: 1;
+  padding-right: var(--space-2);
 }
 
-.brandName {
-  font-family: var(--font-heading);
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: white;
-  line-height: 1.2;
-}
-
-.brandSub {
-  font-size: var(--text-xs);
-  color: var(--sidebar-text);
-  opacity: 0.7;
+.brandLogoImg {
+  max-height: 38px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
 }
 
 .collapseBtn {

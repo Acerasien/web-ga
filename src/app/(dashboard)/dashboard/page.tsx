@@ -35,8 +35,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     getReportData({
       period: 'DAILY',
       year: currentYear,
-      month: currentMonth,
-      branchId: selectedBranchId,
+      months: [currentMonth],
+      branchIds: selectedBranchId ? [selectedBranchId] : undefined,
     }),
     user.role === 'SUPERADMIN' ? getBranches() : Promise.resolve({ success: true, data: [] }),
   ]);

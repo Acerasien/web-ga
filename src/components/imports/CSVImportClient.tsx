@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import { 
@@ -13,6 +13,8 @@ import CSVImportPreviewTable from './CSVImportParts/CSVImportPreviewTable';
 import { CSVImportSuccessView, CSVImportFailView } from './CSVImportParts/CSVImportResultViews';
 import { importTransactions } from '@/lib/actions/imports';
 import type { CSVImportResult } from '@/lib/actions/imports';
+import { getCategoriesWithSub } from '@/lib/actions/categories';
+import type { CategoryWithSub } from '@/lib/actions/categories';
 import type { AuthUser } from '@/types';
 import { formatRupiah, formatPaymentMethod } from '@/lib/formatters';
 import styles from '@/app/(dashboard)/transaksi/import/import.module.css';
@@ -38,8 +40,19 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
   const [loading, setLoading] = useState<boolean>(false);
   const [result, setResult] = useState<CSVImportResult | null>(null);
   const [generalError, setGeneralError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<CategoryWithSub[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      const res = await getCategoriesWithSub();
+      if (res.success && res.data) {
+        setCategories(res.data);
+      }
+    };
+    loadCategories();
+  }, []);
 
   // Drag-and-drop event handlers
   const handleDrag = (e: React.DragEvent) => {
@@ -331,6 +344,45 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
     XLSX.writeFile(wb, "template_import_transaksi.xlsx");
   };
 
+  const handleDownloadCategories = () => {
+    if (categories.length === 0) {
+      alert('Daftar kategori belum selesai dimuat. Silakan coba sesaat lagi.');
+      return;
+    }
+
+    const headers = ['Kategori', 'Sub-Kategori'];
+    const rows: any[][] = [];
+
+    categories.forEach(cat => {
+      if (cat.subCategories.length === 0) {
+        rows.push([cat.name, '']);
+      } else {
+        cat.subCategories.forEach(sub => {
+          rows.push([cat.name, sub.name]);
+        });
+      }
+    });
+
+    const data = [headers, ...rows];
+
+    // Create Worksheet
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // Set styling and column widths
+    const wscols = [
+      { wch: 25 }, // Kategori
+      { wch: 25 }  // Sub-Kategori
+    ];
+    ws['!cols'] = wscols;
+
+    // Create Workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Daftar Kategori");
+
+    // Write file & trigger download
+    XLSX.writeFile(wb, "daftar_kategori_dan_subkategori.xlsx");
+  };
+
   return (
     <div className={styles.container}>
       <header className={styles.titleBlock}>
@@ -341,7 +393,11 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       <div className={styles.card}>
         {/* Specs & Guide banner shown by default unless showing success page */}
         {(!result || result.errors.length > 0) && (
-          <CSVImportSpecsGuide onDownloadTemplate={handleDownloadTemplate} />
+          <CSVImportSpecsGuide 
+            onDownloadTemplate={handleDownloadTemplate} 
+            onDownloadCategories={handleDownloadCategories}
+            categories={categories}
+          />
         )}
 
         {generalError && !result && (

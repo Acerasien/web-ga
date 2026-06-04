@@ -6,6 +6,7 @@ import type { ApiResponse } from '@/types';
 import { UserRole, Prisma } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { revalidatePath } from 'next/cache';
+import { createAuditLog } from '@/lib/actions/audit';
 import type { TransactionWithRelations } from './transactions';
 
 export interface UserFilters {
@@ -182,6 +183,14 @@ export async function createUser(data: {
       },
     });
 
+    await createAuditLog({
+      userId: actor.id,
+      actionType: 'CREATE',
+      targetTable: 'User',
+      targetId: String(newUser.id),
+      description: `Membuat akun baru: @${newUser.username} (${newUser.fullName}) dengan peran ${newUser.role}`,
+    });
+
     revalidatePath('/admin/users');
 
     return {
@@ -303,6 +312,15 @@ export async function updateUser(
       },
     });
 
+    const fieldsChanged = Object.keys(updateData).join(', ');
+    await createAuditLog({
+      userId: actor.id,
+      actionType: 'UPDATE',
+      targetTable: 'User',
+      targetId: String(updatedUser.id),
+      description: `Memperbarui akun @${updatedUser.username}: mengubah ${fieldsChanged}`,
+    });
+
     revalidatePath('/admin/users');
     revalidatePath('/dashboard');
 
@@ -354,9 +372,18 @@ export async function adminResetPassword(
     // Cryptographically re-hash password
     const passwordHash = await bcrypt.hash(newPasswordText, 10);
 
-    await prisma.user.update({
+    const updated = await prisma.user.update({
       where: { id },
       data: { passwordHash },
+      select: { username: true },
+    });
+
+    await createAuditLog({
+      userId: actor.id,
+      actionType: 'UPDATE',
+      targetTable: 'User',
+      targetId: String(id),
+      description: `Mereset password untuk akun @${updated.username}`,
     });
 
     return {

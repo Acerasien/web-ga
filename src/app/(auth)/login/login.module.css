@@ -31,6 +31,18 @@
   margin-bottom: var(--space-8);
 }
 
+.logoWrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-4);
+}
+
+.logoImage {
+  max-height: 80px;
+  width: auto;
+  object-fit: contain;
+}
+
 .logoTitle {
   font-family: var(--font-heading);
   font-size: var(--text-3xl);

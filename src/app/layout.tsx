@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: 'Web GA — General Affairs Tracker',
   description: 'Sistem pencatatan aktivitas General Affairs',
   icons: {
-    icon: '/favicon.ico',
+    icon: '/Logo_Favicon.png',
   },
 };
 

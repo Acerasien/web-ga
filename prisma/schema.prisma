@@ -73,6 +73,7 @@ model User {
   transactions    Transaction[]
   ongoingPayments OngoingPayment[]
   recurringBills  RecurringBill[]
+  auditLogs       AuditLog[]
 
   @@map("users")
 }
@@ -219,4 +220,22 @@ model RecurringBill {
   @@index([isActive, nextDueDate], name: "idx_rb_active_due")
 
   @@map("recurring_bills")
+}
+
+/// Catatan log audit aktivitas transaksi dan konfigurasi admin
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  actionType  String   @map("action_type") @db.VarChar(20) // CREATE, UPDATE, DELETE
+  targetTable String   @map("target_table") @db.VarChar(50) // Transaction, User, Branch, Category
+  targetId    String   @map("target_id") @db.VarChar(50)
+  description String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt(sort: Desc)], name: "idx_audit_created_at")
+  @@index([userId], name: "idx_audit_user")
+  @@map("audit_logs")
 }

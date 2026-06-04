@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/actions/auth';
 import type { ApiResponse } from '@/types';
 import { revalidatePath } from 'next/cache';
+import { createAuditLog } from '@/lib/actions/audit';
 
 export interface SubCategoryAdminPayload {
   id: number;
@@ -145,6 +146,14 @@ export async function addSubCategory(
       },
     });
 
+    await createAuditLog({
+      userId: actor.id,
+      actionType: 'CREATE',
+      targetTable: 'SubCategory',
+      targetId: String(newSub.id),
+      description: `Menambahkan sub-kategori baru "${newSub.name}" ke kategori "${categoryExists.name}"`,
+    });
+
     revalidatePath('/admin/kategori');
     revalidatePath('/transaksi/input');
 
@@ -196,6 +205,14 @@ export async function deleteSubCategory(id: number): Promise<ApiResponse<{ succe
     // 2. Safely perform deletion
     await prisma.subCategory.delete({
       where: { id },
+    });
+
+    await createAuditLog({
+      userId: actor.id,
+      actionType: 'DELETE',
+      targetTable: 'SubCategory',
+      targetId: String(id),
+      description: `Menghapus sub-kategori ID ${id}`,
     });
 
     revalidatePath('/admin/kategori');

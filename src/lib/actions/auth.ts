@@ -5,6 +5,7 @@ import bcrypt from 'bcrypt';
 import { prisma } from '@/lib/prisma';
 import { signJWT, verifyJWT } from '@/lib/auth/jwt';
 import type { LoginRequest, ApiResponse, JWTPayload, AuthUser } from '@/types';
+import { createAuditLog } from '@/lib/actions/audit';
 
 /**
  * Server Action to authenticate credentials, sign JWT, and set an HttpOnly cookie.
@@ -74,6 +75,15 @@ export async function login(data: LoginRequest): Promise<ApiResponse<void>> {
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24, // 24 hours session duration
+    });
+
+    // Record login action in audit log
+    await createAuditLog({
+      userId: user.id,
+      actionType: 'CREATE',
+      targetTable: 'User',
+      targetId: String(user.id),
+      description: `User @${user.username} (${user.fullName}) berhasil masuk ke sistem`,
     });
 
     return {

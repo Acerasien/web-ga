@@ -56,7 +56,13 @@ function LoginContent() {
   return (
     <div className={styles.card}>
       <header className={styles.header}>
-        <h1 className={styles.logoTitle}>Web GA</h1>
+        <div className={styles.logoWrapper}>
+          <img
+            src="/Logo_Login.png"
+            alt="Web GA Logo"
+            className={styles.logoImage}
+          />
+        </div>
         <p className={styles.logoSub}>Sistem Pencatatan Aktivitas General Affairs</p>
       </header>
 
@@ -151,7 +157,6 @@ export default function LoginPage() {
       <Suspense
         fallback={
           <div className={styles.card} style={{ textAlign: 'center' }}>
-            <h1 className={styles.logoTitle}>Web GA</h1>
             <p className={styles.logoSub} style={{ marginBottom: 'var(--space-6)' }}>
               Memuat sistem login...
             </p>

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/actions/auth';
 import type { ApiResponse } from '@/types';
 import { revalidatePath } from 'next/cache';
+import { createAuditLog } from '@/lib/actions/audit';
 
 export interface BranchAdminPayload {
   id: number;
@@ -123,6 +124,14 @@ export async function createBranch(data: {
       },
     });
 
+    await createAuditLog({
+      userId: actor.id,
+      actionType: 'CREATE',
+      targetTable: 'Branch',
+      targetId: String(newBranch.id),
+      description: `Membuat cabang baru: ${newBranch.name} (${newBranch.code})`,
+    });
+
     revalidatePath('/admin/branches');
     revalidatePath('/admin/users');
     revalidatePath('/transaksi/riwayat');
@@ -229,6 +238,15 @@ export async function updateBranch(
       },
     });
 
+    const fieldsChanged = Object.keys(updateData).join(', ');
+    await createAuditLog({
+      userId: actor.id,
+      actionType: 'UPDATE',
+      targetTable: 'Branch',
+      targetId: String(updated.id),
+      description: `Memperbarui cabang ${updated.code}: mengubah ${fieldsChanged}`,
+    });
+
     const totalSpending = updated.transactions.reduce((sum, tx) => sum + Number(tx.totalAmount), 0);
 
     revalidatePath('/admin/branches');
@@ -309,6 +327,14 @@ export async function deleteBranch(id: number): Promise<ApiResponse<{ success: b
     // 4. All checks passed, perform deletion
     await prisma.branch.delete({
       where: { id },
+    });
+
+    await createAuditLog({
+      userId: actor.id,
+      actionType: 'DELETE',
+      targetTable: 'Branch',
+      targetId: String(id),
+      description: `Menghapus cabang ID ${id}`,
     });
 
     revalidatePath('/admin/branches');

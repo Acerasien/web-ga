@@ -17,6 +17,7 @@ import {
   LogOut,
   Clock,
   CalendarClock,
+  ShieldAlert,
 } from 'lucide-react';
 import type { AuthUser, NavItem } from '@/types';
 import styles from './Sidebar.module.css';
@@ -34,6 +35,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Pengguna', href: '/admin/users', icon: 'Users', roles: ['SUPERADMIN'] },
   { label: 'Cabang', href: '/admin/branches', icon: 'Building2', roles: ['SUPERADMIN'] },
   { label: 'Kategori', href: '/admin/kategori', icon: 'Settings', roles: ['SUPERADMIN'] },
+  { label: 'Audit Log', href: '/admin/audit-log', icon: 'ShieldAlert', roles: ['SUPERADMIN'] },
 ];
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -47,6 +49,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Upload,
   Clock,
   CalendarClock,
+  ShieldAlert,
 };
 
 interface SidebarProps {
@@ -84,9 +87,12 @@ export default function Sidebar({
       {/* Brand */}
       <div className={styles.brand}>
         {!collapsed && (
-          <div className={styles.brandText}>
-            <span className={styles.brandName}>Web GA</span>
-            <span className={styles.brandSub}>General Affairs</span>
+          <div className={styles.brandLogo}>
+            <img
+              src="/logo-h.png"
+              alt="Logo"
+              className={styles.brandLogoImg}
+            />
           </div>
         )}
         <button

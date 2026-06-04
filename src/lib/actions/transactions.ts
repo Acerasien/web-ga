@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/actions/auth';
 import type { TransactionFormData, ApiResponse } from '@/types';
 import { Prisma } from '@prisma/client';
+import { createAuditLog } from '@/lib/actions/audit';
 
 /**
  * Helper to convert date month to Roman numeral
@@ -185,9 +186,17 @@ export async function createTransaction(
               ...(isRecurringSpawn ? { isMoneyEnough: true } : {}),
             }
           });
+
+          await createAuditLog({
+            userId: user.id,
+            actionType: 'CREATE',
+            targetTable: 'Transaction',
+            targetId: String(newTx.id),
+            description: `Mencatat transaksi dari tagihan berjalan: "${newTx.description}" senilai Rp ${Number(newTx.totalAmount).toLocaleString('id-ID')}`,
+          }, tx);
         });
       } else {
-        await prisma.transaction.create({
+        const newTx = await prisma.transaction.create({
           data: {
             branchId: targetBranchId,
             userId: user.id,
@@ -210,6 +219,14 @@ export async function createTransaction(
             customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,
             beritaAcara: finalBeritaAcara,
           },
+        });
+
+        await createAuditLog({
+          userId: user.id,
+          actionType: 'CREATE',
+          targetTable: 'Transaction',
+          targetId: String(newTx.id),
+          description: `Mencatat transaksi baru: "${newTx.description}" senilai Rp ${Number(newTx.totalAmount).toLocaleString('id-ID')}`,
         });
       }
     } catch (error) {
@@ -468,6 +485,12 @@ export async function deleteTransaction(id: number): Promise<ApiResponse<{ succe
       };
     }
 
+    // Fetch details before deletion
+    const targetTx = await prisma.transaction.findUnique({
+      where: { id },
+      select: { description: true, totalAmount: true },
+    });
+
     // Delete transaction cleanly from Prisma, including its corresponding ongoing payment request
     await prisma.ongoingPayment.deleteMany({
       where: { transactionId: id },
@@ -476,6 +499,16 @@ export async function deleteTransaction(id: number): Promise<ApiResponse<{ succe
     await prisma.transaction.delete({
       where: { id },
     });
+
+    if (targetTx) {
+      await createAuditLog({
+        userId: user.id,
+        actionType: 'DELETE',
+        targetTable: 'Transaction',
+        targetId: String(id),
+        description: `Menghapus transaksi ID ${id}: "${targetTx.description}" senilai Rp ${Number(targetTx.totalAmount).toLocaleString('id-ID')}`,
+      });
+    }
 
     // Clear router cache tags to trigger live layout refreshes
     revalidatePath('/dashboard');
