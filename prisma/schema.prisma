@@ -33,6 +33,13 @@ enum RecurringBillFrequency {
   YEARLY
 }
 
+enum Location {
+  SITE
+  MESS
+  OFFICE
+}
+
+
 // ============================================================
 // MODELS
 // ============================================================
@@ -134,6 +141,7 @@ model Transaction {
   // total_amount = (qty × price_per_unit) - (discount_per_unit × qty) - discount_total + tax_amount
   totalAmount     Decimal       @map("total_amount") @db.Decimal(15, 2)
   paymentMethod   PaymentMethod @map("payment_method")
+  location        Location?
   vendor          String?       @db.VarChar(100)
   receiptPath     String?       @map("receipt_path") @db.VarChar(500)
   notes           String?       @db.Text
@@ -155,6 +163,7 @@ model Transaction {
   @@index([userId], name: "idx_tx_user")
   @@index([transactionDate(sort: Desc)], name: "idx_tx_date")
   @@index([paymentMethod], name: "idx_tx_payment")
+  @@index([location])
 
   @@map("transactions")
 }
@@ -175,6 +184,7 @@ model OngoingPayment {
   actualAmount       Decimal?       @map("actual_amount") @db.Decimal(15, 2)
   transactionId      Int?           @unique @map("transaction_id")
   frequency          String?        @db.VarChar(20) // e.g. "Monthly", "Yearly", "One-time"
+  location           Location?
   // Link to recurring bill template (if this was auto-spawned)
   recurringBillId    Int?           @map("recurring_bill_id")
   requestDate        DateTime       @default(now()) @map("request_date") @db.Date
@@ -194,6 +204,7 @@ model OngoingPayment {
   @@index([createdAt(sort: Desc)])
   @@index([recurringBillId], name: "idx_op_recurring_bill")
   @@index([subCategoryId], name: "idx_op_sub_category")
+  @@index([location])
   @@map("ongoing_payments")
 }
 
@@ -209,6 +220,7 @@ model RecurringBill {
   frequency       RecurringBillFrequency
   nextDueDate     DateTime               @map("next_due_date") @db.Date
   isActive        Boolean                @default(true) @map("is_active")
+  location        Location?
   notes           String?                @db.Text
   createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime               @updatedAt @map("updated_at") @db.Timestamptz
@@ -222,7 +234,7 @@ model RecurringBill {
   // Indexes
   @@index([branchId, nextDueDate], name: "idx_rb_branch_due")
   @@index([isActive, nextDueDate], name: "idx_rb_active_due")
-
+  @@index([location])
   @@map("recurring_bills")
 }
 

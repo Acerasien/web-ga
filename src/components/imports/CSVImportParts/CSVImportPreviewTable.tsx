@@ -77,6 +77,7 @@ export default function CSVImportPreviewTable({ previewSummary, previewRows }: C
                   <th>Harga Satuan</th>
                   <th>Subtotal</th>
                   <th>Pembayaran</th>
+                  <th>Lokasi</th>
                   <th>Vendor Mapped</th>
                   <th>Keterangan</th>
                 </tr>
@@ -103,6 +104,13 @@ export default function CSVImportPreviewTable({ previewSummary, previewRows }: C
                       </td>
                       <td style={{ fontWeight: 600 }}>{formatRupiah(row.subtotal)}</td>
                       <td>{formatPaymentMethod(row.paymentMethod)}</td>
+                      <td>
+                        {row.location ? (
+                          <span className={`badge ${row.location === 'SITE' ? 'badge-info' : row.location === 'MESS' ? 'badge-warning' : 'badge-success'}`} style={{ textTransform: 'capitalize' }}>
+                            {row.location.toLowerCase()}
+                          </span>
+                        ) : '-'}
+                      </td>
                       <td>{row.vendor || '-'}</td>
                       <td>
                         {isRowInvalid ? (

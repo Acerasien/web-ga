@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { createOngoingPayment } from '@/lib/actions/ongoing';
 import type { AuthUser } from '@/types';
-import type { Branch } from '@prisma/client';
+import type { Branch, Location } from '@prisma/client';
 import type { CategoryWithSub } from '@/lib/actions/categories';
 import styles from '@/app/(dashboard)/transaksi/input/input.module.css';
 
@@ -39,6 +39,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
   );
   const [categoryId, setCategoryId] = useState<string>('');
   const [subCategoryId, setSubCategoryId] = useState<string>('');
+  const [location, setLocation] = useState<string>('');
 
   const selectedCategory = categories.find(c => c.id === Number(categoryId));
   const subCategories = selectedCategory?.subCategories || [];
@@ -177,6 +178,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
           initialReceiptPath: receiptPath || undefined,
           requestDate,
           frequency: frequency || undefined,
+          location: location ? (location as Location) : undefined,
         });
 
         if (res.success) {
@@ -201,6 +203,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
     setDescription('');
     setAmountNeeded('');
     setFrequency('');
+    setLocation('');
     handleRemoveReceipt();
   };
 
@@ -299,6 +302,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
                 value={subCategoryId}
                 onChange={(e) => setSubCategoryId(e.target.value)}
                 disabled={!isMounted || isPending || !categoryId || subCategories.length === 0}
+                suppressHydrationWarning
               >
                 <option value="">
                   {!categoryId
@@ -326,6 +330,22 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
                 <option value="Mingguan">Mingguan</option>
                 <option value="Bulanan">Bulanan</option>
                 <option value="Tahunan">Tahunan</option>
+              </select>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="location" className={styles.label}>Lokasi (Opsional)</label>
+              <select
+                id="location"
+                className={styles.input}
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                disabled={isPending}
+              >
+                <option value="">-- Pilih Lokasi --</option>
+                <option value="SITE">Site</option>
+                <option value="MESS">Mess</option>
+                <option value="OFFICE">Office</option>
               </select>
             </div>
 

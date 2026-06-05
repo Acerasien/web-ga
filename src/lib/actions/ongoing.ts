@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/actions/auth';
 import type { ApiResponse } from '@/types';
-import { Prisma, PaymentMethod } from '@prisma/client';
+import { Prisma, PaymentMethod, Location } from '@prisma/client';
 import type { OngoingPayment, Category, SubCategory, Branch } from '@prisma/client';
 
 // ============================================================
@@ -167,6 +167,7 @@ export async function createOngoingPayment(data: {
   initialReceiptPath?: string;
   requestDate?: string;
   frequency?: string;
+  location?: Location;
 }): Promise<ApiResponse<void>> {
   try {
     const user = await getCurrentUser();
@@ -207,6 +208,7 @@ export async function createOngoingPayment(data: {
         requestDate: data.requestDate ? new Date(data.requestDate) : new Date(),
         status: 'BELUM_DIBAYAR',
         frequency: data.frequency || null,
+        location: data.location || null,
       },
     });
 
@@ -361,6 +363,7 @@ export async function realizeOngoingPayment(
           receiptPath: data.finalReceiptPath,
           notes: data.notes?.trim() || null,
           beritaAcara: finalBeritaAcara,
+          location: payment.location,
         },
       });
 

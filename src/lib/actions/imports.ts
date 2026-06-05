@@ -160,6 +160,7 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
     const idxUnit = headers.findIndex(h => h.includes('satuan') || h.includes('unit'));
     const idxPrice = headers.findIndex(h => h.includes('harga') || h.includes('price'));
     const idxPayment = headers.findIndex(h => h.includes('pembayaran') || h.includes('payment') || h.includes('metode'));
+    const idxLocation = headers.findIndex(h => h === 'lokasi' || h.includes('location'));
     const idxVendor = headers.findIndex(h => h.includes('vendor') || h.includes('supplier'));
     const idxNotes = headers.findIndex(h => h.includes('catatan') || h.includes('notes'));
     const idxBranch = headers.findIndex(h => h.includes('cabang') || h.includes('branch'));
@@ -287,6 +288,16 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
         const vendor = idxVendor !== -1 ? row[idxVendor]?.trim() || null : null;
         const notes = idxNotes !== -1 ? row[idxNotes]?.trim() || null : null;
 
+        let locationVal: any = null;
+        if (idxLocation !== -1 && row[idxLocation] && row[idxLocation].trim() !== '') {
+          const locRaw = row[idxLocation].trim().toUpperCase();
+          if (locRaw === 'SITE' || locRaw === 'MESS' || locRaw === 'OFFICE') {
+            locationVal = locRaw;
+          } else {
+            throw new Error(`Lokasi '${row[idxLocation]}' tidak valid. Harus salah satu dari: Site, Mess, Office.`);
+          }
+        }
+
         // Dynamic Berita Acara (BA) generation for import
         const year = transactionDate.getFullYear();
         const startOfYear = new Date(year, 0, 1);
@@ -339,6 +350,7 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
           pricePerUnit: new Prisma.Decimal(pricePerUnit),
           totalAmount,
           paymentMethod,
+          location: locationVal,
           vendor,
           notes,
           customFields: Prisma.DbNull, // CSV imports do not map complex custom categories forms natively

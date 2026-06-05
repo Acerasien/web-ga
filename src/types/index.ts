@@ -1,7 +1,7 @@
 // Shared TypeScript types for Web_GA
 // These supplement Prisma's generated types with frontend-specific interfaces
 
-import type { UserRole, PaymentMethod } from '@prisma/client';
+import type { UserRole, PaymentMethod, Location } from '@prisma/client';
 
 // ============================================================
 // Auth Types
@@ -66,6 +66,7 @@ export interface TransactionFormData {
   taxAmount?: number;
   taxNote?: string;
   paymentMethod: PaymentMethod;
+  location?: Location;
   vendor?: string;
   receiptPath?: string;
   notes?: string;

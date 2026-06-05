@@ -23,7 +23,7 @@ export default function CSVImportSpecsGuide({
         </span>
         
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 6px', marginTop: '6px', marginBottom: '6px' }}>
-          {['Tanggal', 'Kategori', 'Sub-Kategori', 'Deskripsi', 'Kuantitas', 'Satuan', 'Harga Satuan', 'Pembayaran', 'Vendor', 'Catatan'].map(col => (
+          {['Tanggal', 'Kategori', 'Sub-Kategori', 'Deskripsi', 'Kuantitas', 'Satuan', 'Harga Satuan', 'Pembayaran', 'Lokasi', 'Vendor', 'Catatan'].map(col => (
             <span key={col} style={{ 
               fontSize: '10px', 
               fontFamily: 'var(--font-mono)', 
@@ -43,6 +43,7 @@ export default function CSVImportSpecsGuide({
         <ul style={{ margin: 'var(--space-2) 0 0 0', paddingLeft: 'var(--space-4)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <li><strong>Tanggal</strong> mendukung format <code style={{ fontWeight: 600 }}>YYYY-MM-DD</code> atau standard Excel Indonesia <code style={{ fontWeight: 600 }}>DD/MM/YYYY</code>.</li>
           <li><strong>Pembayaran</strong> menerima salah satu nilai berikut: <code style={{ fontWeight: 600 }}>CASH</code>, <code style={{ fontWeight: 600 }}>TRANSFER</code>, atau <code style={{ fontWeight: 600 }}>PETTY_CASH</code>.</li>
+          <li><strong>Lokasi (Opsional)</strong> menerima salah satu nilai berikut: <code style={{ fontWeight: 600 }}>SITE</code>, <code style={{ fontWeight: 600 }}>MESS</code>, atau <code style={{ fontWeight: 600 }}>OFFICE</code> (opsional, biarkan kosong jika tidak ditentukan).</li>
           <li><strong>Kategori Mismatch (Poka-Yoke)</strong>: Jika nama kategori tidak dikenali di database, transaksi otomatis dipetakan ke kategori <code style={{ fontWeight: 600 }}>"Lain-lain"</code>.</li>
           <li><strong>Relational Rollback (Atomic Safeguard)</strong>: Jika terdapat kesalahan format pada baris mana pun, seluruh impor akan digagalkan dan dibatalkan (rollback) untuk menjaga integritas database.</li>
         </ul>

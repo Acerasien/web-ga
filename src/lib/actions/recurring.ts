@@ -165,6 +165,7 @@ export async function checkAndSpawnRecurringBills(
             status: 'BELUM_DIBAYAR',
             recurringBillId: currentBill.id,
             requestDate: currentBill.nextDueDate, // Use exact due date
+            location: currentBill.location,
           },
         });
 

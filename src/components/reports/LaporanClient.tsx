@@ -1495,7 +1495,6 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
                       formatter={(value) => [formatRupiah(Number(value)), 'Pengeluaran']}
                       contentStyle={{ background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '12px' }}
                     />
-                    <Legend verticalAlign="top" height={36} />
                     
                     {comparisonBranches
                       .filter((branch) => selectedBranchCodes.includes(branch.code))
@@ -1512,6 +1511,51 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
                 </ResponsiveContainer>
               ) : null}
             </div>
+
+            {/* Custom Interactive Wrap-Pill Legend */}
+            {comparisonData.length > 0 && comparisonBranches.length > 0 && (
+              <div className={styles.legendContainer}>
+                {comparisonBranches.map((branch) => {
+                  const isActive = selectedBranchCodes.includes(branch.code);
+                  const activeIndex = comparisonBranches
+                    .filter((b) => selectedBranchCodes.includes(b.code))
+                    .findIndex((b) => b.code === branch.code);
+                  const color = isActive && activeIndex !== -1
+                    ? CHART_COLORS[activeIndex % CHART_COLORS.length]
+                    : undefined;
+
+                  return (
+                    <button
+                      key={branch.code}
+                      type="button"
+                      onClick={() => toggleBranch(branch.code)}
+                      className={`${styles.legendPill} ${!isActive ? styles.legendPillInactive : ''}`}
+                      title={
+                        !isActive 
+                          ? `Klik untuk membandingkan ${branch.name}` 
+                          : selectedBranchCodes.length === 1 
+                          ? 'Minimal satu cabang harus dipilih' 
+                          : `Klik untuk menyembunyikan ${branch.name}`
+                      }
+                      disabled={isActive && selectedBranchCodes.length === 1}
+                      style={isActive && selectedBranchCodes.length === 1 ? { cursor: 'not-allowed' } : {}}
+                    >
+                      {isActive ? (
+                        <span 
+                          className={styles.legendDot} 
+                          style={{ backgroundColor: color }}
+                        />
+                      ) : (
+                        <span className={`${styles.legendDot} ${styles.legendDotInactive}`} />
+                      )}
+                      <span>
+                        {branch.name} ({branch.code})
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>
       )}

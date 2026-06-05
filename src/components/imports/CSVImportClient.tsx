@@ -85,6 +85,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       const idxUnit = headers.findIndex(h => h.includes('satuan') || h.includes('unit'));
       const idxPrice = headers.findIndex(h => h.includes('harga') || h.includes('price'));
       const idxPayment = headers.findIndex(h => h.includes('pembayaran') || h.includes('payment') || h.includes('metode'));
+      const idxLocation = headers.findIndex(h => h === 'lokasi' || h.includes('location'));
       const idxBranch = headers.findIndex(h => h.includes('cabang') || h.includes('branch'));
       const idxVendor = headers.findIndex(h => h.includes('vendor') || h.includes('supplier'));
 
@@ -120,6 +121,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
 
         const unitRaw = idxUnit !== -1 ? String(row[idxUnit] || '').trim() : 'Unit';
         const paymentRaw = idxPayment !== -1 ? String(row[idxPayment] || '').trim().toUpperCase() : 'CASH';
+        const locationRaw = idxLocation !== -1 ? String(row[idxLocation] || '').trim().toUpperCase() : '';
         const branchRaw = idxBranch !== -1 ? String(row[idxBranch] || '').trim() : '';
         const vendorRaw = idxVendor !== -1 ? String(row[idxVendor] || '').trim() : '';
 
@@ -129,6 +131,15 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         if (!descriptionRaw) errors.push('Deskripsi tidak boleh kosong');
         if (isNaN(quantity) || quantity <= 0) errors.push('Kuantitas harus positif');
         if (isNaN(pricePerUnit) || pricePerUnit < 0) errors.push('Harga satuan harus positif');
+
+        let locationVal = '';
+        if (locationRaw) {
+          if (locationRaw === 'SITE' || locationRaw === 'MESS' || locationRaw === 'OFFICE') {
+            locationVal = locationRaw;
+          } else {
+            errors.push('Lokasi harus salah satu dari: Site, Mess, Office');
+          }
+        }
 
         if (errors.length > 0) {
           hasErrors = true;
@@ -145,6 +156,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
           pricePerUnit,
           subtotal,
           paymentMethod: paymentRaw,
+          location: locationVal,
           branch: branchRaw,
           vendor: vendorRaw,
           errors,
@@ -306,6 +318,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       "Satuan",
       "Harga Satuan",
       "Pembayaran",
+      "Lokasi",
       "Vendor",
       "Catatan"
     ];
@@ -320,6 +333,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         "Box",
         35000,
         "CASH",
+        "Office",
         "RM Padang Sinar",
         "Makan siang rapat bulanan GA"
       ],
@@ -332,6 +346,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         "Rim",
         48000,
         "PETTY_CASH",
+        "Site",
         "Toko Buku Jaya",
         "Stok kertas printer kantor"
       ]
@@ -352,6 +367,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       { wch: 8 },  // Satuan
       { wch: 12 }, // Harga Satuan
       { wch: 12 }, // Pembayaran
+      { wch: 12 }, // Lokasi
       { wch: 20 }, // Vendor
       { wch: 30 }  // Catatan
     ];

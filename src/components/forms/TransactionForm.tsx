@@ -20,7 +20,7 @@ import { createTransaction } from '@/lib/actions/transactions';
 import { formatRupiah } from '@/lib/formatters';
 import type { AuthUser, TransactionFormData, FieldsConfig, CategoryField } from '@/types';
 import type { CategoryWithSub } from '@/lib/actions/categories';
-import type { Branch, PaymentMethod } from '@prisma/client';
+import type { Branch, PaymentMethod, Location } from '@prisma/client';
 import styles from '@/app/(dashboard)/transaksi/input/input.module.css';
 import modalStyles from '@/components/modals/modal.module.css';
 
@@ -65,6 +65,7 @@ export default function TransactionForm({ user, categories, branches, initialOng
   const [priceDisplay, setPriceDisplay] = useState<string>(initialPrice > 0 ? initialPrice.toLocaleString('id-ID') : '');
   
   const [paymentMethod, setPaymentMethod] = useState<string>('CASH');
+  const [location, setLocation] = useState<string>(initialOngoingPayment?.location || '');
   const [vendor, setVendor] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [branchId, setBranchId] = useState<string>(initialOngoingPayment?.branchId ? String(initialOngoingPayment.branchId) : '');
@@ -231,6 +232,7 @@ export default function TransactionForm({ user, categories, branches, initialOng
           taxAmount: breakdownOpen && taxAmount > 0 ? taxAmount : undefined,
           taxNote: breakdownOpen && taxNote.trim() ? taxNote.trim() : undefined,
           paymentMethod: paymentMethod as PaymentMethod,
+          location: location ? (location as Location) : undefined,
           vendor: vendor.trim() || undefined,
           receiptPath: receiptPath || undefined,
           notes: notes.trim() || undefined,
@@ -271,6 +273,7 @@ export default function TransactionForm({ user, categories, branches, initialOng
     setCustomFields({});
     setSubCategoryId('');
     setBeritaAcara('');
+    setLocation('');
     // Reset breakdown panel
     setBreakdownOpen(false);
     setDiscountPerUnit(0);
@@ -404,6 +407,7 @@ export default function TransactionForm({ user, categories, branches, initialOng
                 value={subCategoryId}
                 onChange={(e) => setSubCategoryId(e.target.value)}
                 disabled={!isMounted || isPending || !categoryId || subCategories.length === 0}
+                suppressHydrationWarning
               >
                 <option value="">
                   {!categoryId
@@ -415,6 +419,25 @@ export default function TransactionForm({ user, categories, branches, initialOng
                 {subCategories.map(sub => (
                   <option key={sub.id} value={sub.id}>{sub.name}</option>
                 ))}
+              </select>
+            </div>
+
+            {/* Lokasi Field */}
+            <div className={styles.formGroup}>
+              <label htmlFor="location" className={styles.label}>
+                Lokasi (Opsional)
+              </label>
+              <select
+                id="location"
+                className={styles.input}
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                disabled={isPending}
+              >
+                <option value="">-- Pilih Lokasi --</option>
+                <option value="SITE">Site</option>
+                <option value="MESS">Mess</option>
+                <option value="OFFICE">Office</option>
               </select>
             </div>
 
@@ -875,6 +898,13 @@ export default function TransactionForm({ user, categories, branches, initialOng
                       : paymentMethod === 'TRANSFER' 
                         ? 'Transfer Bank' 
                         : 'Tunai (Cash)'}
+                  </span>
+                </div>
+
+                <div className={modalStyles.item}>
+                  <span className={modalStyles.label}>Lokasi</span>
+                  <span className={modalStyles.value}>
+                    {location === 'SITE' ? 'Site' : location === 'MESS' ? 'Mess' : location === 'OFFICE' ? 'Office' : '-'}
                   </span>
                 </div>
 

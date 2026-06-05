@@ -191,6 +191,19 @@ export default function TransactionDetailModal({
               </div>
               <div className={styles.item}>
                 <span className={styles.label}>
+                  <MapPin size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
+                  Lokasi
+                </span>
+                <span className={styles.value}>
+                  {transaction.location ? (
+                    <span className={`badge ${transaction.location === 'SITE' ? 'badge-info' : transaction.location === 'MESS' ? 'badge-warning' : 'badge-success'}`} style={{ textTransform: 'capitalize' }}>
+                      {transaction.location.toLowerCase()}
+                    </span>
+                  ) : '-'}
+                </span>
+              </div>
+              <div className={styles.item}>
+                <span className={styles.label}>
                   <User size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
                   Pencatat (Petugas)
                 </span>
