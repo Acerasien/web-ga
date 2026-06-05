@@ -39,6 +39,12 @@ export default function TransactionForm({ user, categories, branches, initialOng
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
 
+  const [isMounted, setIsMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Primary form fields states
   const [categoryId, setCategoryId] = useState<string>(initialOngoingPayment?.categoryId ? String(initialOngoingPayment.categoryId) : '');
   const [subCategoryId, setSubCategoryId] = useState<string>('');
@@ -397,7 +403,7 @@ export default function TransactionForm({ user, categories, branches, initialOng
                 className={styles.input}
                 value={subCategoryId}
                 onChange={(e) => setSubCategoryId(e.target.value)}
-                disabled={isPending || !categoryId || subCategories.length === 0}
+                disabled={!isMounted || isPending || !categoryId || subCategories.length === 0}
               >
                 <option value="">
                   {!categoryId

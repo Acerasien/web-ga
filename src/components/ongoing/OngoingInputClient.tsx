@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useTransition } from 'react';
+import { useState, useRef, useTransition, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -27,6 +27,11 @@ interface OngoingInputClientProps {
 export default function OngoingInputClient({ user, categories, branches }: OngoingInputClientProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
+  const [isMounted, setIsMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Form states
   const [branchId, setBranchId] = useState<string>(
@@ -293,7 +298,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
                 className={styles.input}
                 value={subCategoryId}
                 onChange={(e) => setSubCategoryId(e.target.value)}
-                disabled={isPending || !categoryId || subCategories.length === 0}
+                disabled={!isMounted || isPending || !categoryId || subCategories.length === 0}
               >
                 <option value="">
                   {!categoryId
