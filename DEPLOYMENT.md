@@ -1,120 +1,89 @@
-# Deployment Guide: Web_GA to VPS (Ubuntu Linux)
+# VPS Deployment Guide: Co-hosting Web_GA alongside Psychology Platform
 
-This guide documents the system requirements, software installation, database seeding, PM2 process management, and Nginx proxy server configurations needed to deploy the Web_GA tracking application online.
-
----
-
-## 1. System Requirements
-
-* **OS**: Ubuntu 22.04 LTS or Ubuntu 24.04 LTS
-* **CPU**: 1 vCPU
-* **RAM**: 1 GB minimum (2 GB recommended to avoid compilation failures during `npm run build` or set up memory swap)
-* **Storage**: 25 GB SSD minimum (increases with volume of receipt photo uploads)
+Since your VPS is already running the **Psychology Testing Platform** (using Node.js, Nginx, and PostgreSQL), you do not need to install these tools again. Instead, we will configure **Web_GA** to run side-by-side with the existing project.
 
 ---
 
-## 2. Server Installation
+## 🗄️ 1. Database Configuration (Co-existence)
 
-Run the following commands on your freshly provisioned VPS:
+PostgreSQL runs on port `5432` and can handle multiple databases and users simultaneously. We will create a new database `web_ga_db` and user `ga_user` on the existing Postgres service.
 
+Log in to the PostgreSQL CLI on your VPS:
 ```bash
-# Update system repositories and upgrade active packages
-sudo apt update && sudo apt upgrade -y
-
-# 1. Install Node.js v20 (LTS)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# 2. Install PostgreSQL Database
-sudo apt install postgresql postgresql-contrib -y
-
-# 3. Install Nginx & Git Utilities
-sudo apt install nginx git -y
-
-# 4. Install PM2 Process Manager globally
-sudo npm install pm2 -g
+sudo -u postgres psql
 ```
 
----
-
-## 3. Database & Database User Configuration
-
-Create a database and a dedicated user inside PostgreSQL:
-
-```bash
-# Enter the PostgreSQL prompt
-sudo -i -u postgres psql
-```
-
-Run these SQL statements inside the prompt:
+Run these SQL statements to create the database resources (use a strong alphanumeric password, e.g., `gaAdmin2026SecurePass`):
 ```sql
--- Create the tracking database
+-- Create a new separate database
 CREATE DATABASE web_ga_db;
 
--- Create the database user with a secure password
-CREATE USER ga_user WITH PASSWORD 'your_secure_password';
+-- Create a new database user
+CREATE USER ga_user WITH PASSWORD 'gaAdmin2026SecurePass';
 
--- Grant permissions to the user
+-- Grant privileges to the user
 GRANT ALL PRIVILEGES ON DATABASE web_ga_db TO ga_user;
 ALTER DATABASE web_ga_db OWNER TO ga_user;
 
--- Exit the prompt
+-- Exit the psql prompt
 \q
 ```
 
 ---
 
-## 4. Deploying & Building the Codebase
+## 📂 2. Cloning & Preparing the Project
 
-1. Clone the codebase to `/var/www/web-ga` and set correct user privileges:
+1. Create a dedicated folder for the project:
    ```bash
-   cd /var/www
-   sudo git clone <YOUR_GIT_REPOSITORY_URL> web-ga
+   sudo mkdir -p /var/www/web-ga
    sudo chown -R $USER:$USER /var/www/web-ga
+   ```
+
+2. Clone the repository into this folder:
+   ```bash
+   git clone https://github.com/Acerasien/web-ga /var/www/web-ga
    cd /var/www/web-ga/web-ga
    ```
 
-2. Install npm dependencies:
+3. Install project dependencies:
    ```bash
    npm install
    ```
 
-3. Create the Production Environment variables configuration:
+4. Create the production environment variables file:
    ```bash
    nano .env
    ```
 
-   Paste and fill out the configuration:
+   Paste and save this configuration:
    ```ini
-   # Database connection configuration
-   DATABASE_URL="postgresql://ga_user:your_secure_password@localhost:5432/web_ga_db?schema=public"
+   # PostgreSQL database connection pointing to the new database
+   DATABASE_URL="postgresql://ga_user:gaAdmin2026SecurePass@localhost:5432/web_ga_db?schema=public"
 
-   # JSON Web Token secret signature key
-   JWT_SECRET="generate_a_very_long_cryptographic_random_string_here"
+   # JWT secret signature key (generate a unique secure key)
+   JWT_SECRET="--generate-a-secure-32-byte-hex-key--"
 
-   # Node Environment parameters
+   # Node server configurations
    NODE_ENV="production"
    PORT=3000
 
-   # Public hostname address
-   NEXT_PUBLIC_APP_URL="https://yourdomain.com"
+   # Your target domain URL for Web_GA
+   NEXT_PUBLIC_APP_URL="https://webga.andamas.id"
    ```
+   *(To generate a secure JWT_SECRET key, run: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`).*
 
-4. Setup Database schema definitions and seed data:
+5. Create tables structure and seed default data (creates default superadmin user, branches, and categories):
    ```bash
-   # Create the tables structure from schema.prisma
    npx prisma migrate deploy
-
-   # Seed default categories, branch listing, and superadmin account details
    npx prisma db seed
    ```
 
-5. Compile the production bundles:
+6. Compile the Next.js production build:
    ```bash
    npm run build
    ```
 
-6. Initialize the receipt upload directories and permissions:
+7. Prepare uploads directory:
    ```bash
    mkdir -p public/uploads/receipts
    chmod -R 775 public/uploads
@@ -122,51 +91,43 @@ ALTER DATABASE web_ga_db OWNER TO ga_user;
 
 ---
 
-## 5. Background Process Management (PM2)
+## ⚙️ 3. Process Management (PM2)
 
-Keep the Next.js application running in the background and configured to recover automatically after a VPS server reboot:
+PM2 is a production process manager that keeps Node.js applications running in the background. Since Node is already installed, we can run the Next.js production server side-by-side with your Python backend:
 
 ```bash
-# Start Next.js using PM2
+# Start the Next.js production server using PM2
 pm2 start npm --name "web-ga" -- start
 
-# Configure system startup scripts
-pm2 startup
-
-# (Copy-paste the instruction command printed by PM2 on the terminal and run it)
-
-# Save process list config
+# Save the process state so it automatically spins up on server restart
 pm2 save
 ```
 
-To manage the application process:
+To monitor both running projects:
 ```bash
-# View dashboard metrics
+# View all active background processes
 pm2 status
 
-# Restart the process
-pm2 restart web-ga
-
-# View live output logs
+# View logs for Web_GA
 pm2 logs web-ga
 ```
 
 ---
 
-## 6. Nginx Reverse Proxy Configuration
+## 🌐 4. Nginx Reverse Proxy Configuration
 
-Configure Nginx to proxy external web requests to Next.js (port 3000) and serve local receipt uploads directly.
+Nginx handles virtual hosts (`server_name`). We will map a new domain (e.g. `webga.andamas.id`) to proxy requests to port `3000` (Next.js), leaving `psikotest.andamas.id` untouched on port `8000`.
 
-1. Create a configuration file:
+1. Create a new Nginx block configuration file:
    ```bash
    sudo nano /etc/nginx/sites-available/web-ga
    ```
 
-2. Paste the configuration below (replace `yourdomain.com` with your actual domain):
+2. Paste the following configuration (replace `webga.andamas.id` with your actual DNS subdomain name):
    ```nginx
    server {
        listen 80;
-       server_name yourdomain.com www.yourdomain.com;
+       server_name webga.andamas.id;
 
        # Serve static uploaded transaction receipts directly via Nginx
        location /uploads/ {
@@ -175,7 +136,7 @@ Configure Nginx to proxy external web requests to Next.js (port 3000) and serve 
            add_header Cache-Control "public, no-transform";
        }
 
-       # Proxy all other request traffic to Next.js
+       # Proxy all other request traffic to Next.js running on Port 3000
        location / {
            proxy_pass http://localhost:3000;
            proxy_http_version 1.1;
@@ -195,23 +156,43 @@ Configure Nginx to proxy external web requests to Next.js (port 3000) and serve 
 
 3. Enable the config, test, and restart Nginx:
    ```bash
+   # Enable our new site configuration
    sudo ln -s /etc/nginx/sites-available/web-ga /etc/nginx/sites-enabled/
+
+   # Test config syntax (make sure both sites compile successfully)
    sudo nginx -t
+
+   # Reload Nginx server
    sudo systemctl restart nginx
    ```
 
 ---
 
-## 7. Configuring HTTPS (SSL) with Let's Encrypt
+## 🔒 5. Configuring HTTPS (SSL)
 
-Provision free, automated SSL certificates via Certbot:
+Once your DNS A-record (e.g. `webga.andamas.id`) is pointing to your VPS public IP address, run Certbot to automatically retrieve and configure your SSL certificate:
 
 ```bash
-# Install Certbot utility
-sudo apt install certbot python3-certbot-nginx -y
-
-# Retrieve and configure SSL certificate inside Nginx configurations
-sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+sudo certbot --nginx -d webga.andamas.id
 ```
 
 Select the option to automatically redirect all standard HTTP connections to secure HTTPS.
+
+---
+
+## 🔄 6. Maintenance & Updates
+
+To deploy updates from GitHub to the production server:
+
+```bash
+cd /var/www/web-ga/web-ga
+git pull origin main
+
+# Update packages & run migrations if models changed
+npm install
+npx prisma migrate deploy
+
+# Recompile and restart the Next.js process
+npm run build
+pm2 restart web-ga
+```
