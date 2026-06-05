@@ -287,7 +287,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
             </div>
 
             <div className={styles.formGroup}>
-              <label htmlFor="subCategoryId" className={styles.label}>Sub-Kategori (Opsional)</label>
+              <label htmlFor="subCategoryId" className={styles.label}>Sub-Kategori</label>
               <select
                 id="subCategoryId"
                 className={styles.input}
