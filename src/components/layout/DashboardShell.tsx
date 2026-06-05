@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import BottomNav from './BottomNav';
@@ -16,6 +16,7 @@ interface DashboardShellProps {
 
 export default function DashboardShell({ user, children }: DashboardShellProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -34,6 +35,26 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
       alert('Terjadi kesalahan koneksi saat keluar.');
     }
   };
+
+  // Map route path to header title (in Indonesian matching the sidebar labels)
+  const getHeaderTitle = (path: string): string => {
+    if (path === '/dashboard') return 'Dashboard';
+    if (path.startsWith('/transaksi/input')) return 'Input Transaksi';
+    if (path.startsWith('/transaksi/riwayat')) return 'Riwayat Transaksi';
+    if (path.startsWith('/transaksi/import')) return 'Import Data';
+    if (path.startsWith('/ongoing/list')) return 'Daftar Pembayaran';
+    if (path.startsWith('/ongoing/input')) return 'Input Pembayaran';
+    if (path.startsWith('/ongoing/riwayat')) return 'Riwayat Pembayaran';
+    if (path.startsWith('/admin/tagihan-rutin')) return 'Tagihan Rutin';
+    if (path.startsWith('/admin/users')) return 'Pengguna';
+    if (path.startsWith('/admin/branches')) return 'Cabang';
+    if (path.startsWith('/admin/kategori')) return 'Kategori';
+    if (path.startsWith('/admin/audit-log')) return 'Audit Log';
+    if (path.startsWith('/laporan')) return 'Laporan Keuangan';
+    return 'Dashboard';
+  };
+
+  const title = getHeaderTitle(pathname);
 
   return (
     <div className={styles.shell}>
@@ -67,7 +88,7 @@ export default function DashboardShell({ user, children }: DashboardShellProps) 
         {/* Top header navigation bar */}
         <Header
           user={user}
-          title="Dashboard" // Will adapt dynamically once we build out sub-route state context
+          title={title}
           onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
         />
 

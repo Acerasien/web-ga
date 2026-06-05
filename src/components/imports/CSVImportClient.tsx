@@ -189,9 +189,30 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         try {
           if (e.target?.result) {
             const data = new Uint8Array(e.target.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array' });
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
+
+            // Normalize Date cells to standard YYYY-MM-DD string format
+            for (const key in worksheet) {
+              if (key[0] === '!') continue;
+              const cell = worksheet[key];
+              if (cell && (cell.t === 'd' || cell.v instanceof Date)) {
+                const date = cell.v instanceof Date ? cell.v : new Date(cell.v);
+                if (!isNaN(date.getTime())) {
+                  // Add 12 hours to handle local timezone / historical offset discrepancies (e.g. 23:59:48 instead of 00:00:00)
+                  const adjusted = new Date(date.getTime() + 12 * 60 * 60 * 1000);
+                  const yyyy = adjusted.getFullYear();
+                  const mm = String(adjusted.getMonth() + 1).padStart(2, '0');
+                  const dd = String(adjusted.getDate()).padStart(2, '0');
+                  const formatted = `${yyyy}-${mm}-${dd}`;
+                  cell.t = 's';
+                  cell.v = formatted;
+                  cell.w = formatted;
+                }
+              }
+            }
+
             const csvContent = XLSX.utils.sheet_to_csv(worksheet);
             setCsvText(csvContent);
             generatePreview(worksheet);

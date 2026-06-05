@@ -12,7 +12,9 @@ import {
   Download, 
   Upload,
   AlertCircle,
-  FileSpreadsheet
+  FileSpreadsheet,
+  SlidersHorizontal,
+  X
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -77,6 +79,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryBreakdown | null>(null);
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState<boolean>(false);
 
   // Comparison Tab Filters States
   const [compPeriods, setCompPeriods] = useState<ComparisonPeriod[]>(() => {
@@ -586,434 +589,533 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
          Tab Panel 1: Summary Dashboard
          ============================================================ */}
       {activeTab === 'SUMMARY' && (
-        <>
-          {/* Dynamic Filters Card */}
-          <section className={styles.filterCard}>
-            <div className={styles.filterGrid}>
-              {/* Scale selection */}
-              <div className={styles.filterGroup}>
-                <label htmlFor="period-scale" className={styles.label}>Skala Periode</label>
-                <select
-                  id="period-scale"
-                  className={styles.input}
-                  value={period}
-                  onChange={(e) => {
-                    const newPeriod = e.target.value as any;
-                    setPeriod(newPeriod);
-                    if ((newPeriod === 'DAILY' || newPeriod === 'WEEKLY') && months.length > 1) {
-                      setMonths([months[0]]);
-                    }
-                  }}
-                >
-                  <option value="DAILY" disabled={months.length > 1}>Harian (Hari ini)</option>
-                  <option value="WEEKLY" disabled={months.length > 1}>Mingguan (Fase 1-5)</option>
-                  <option value="MONTHLY">Bulanan (Tren Tahun)</option>
-                  <option value="YEARLY">Tahunan (5 Tahun Lalu)</option>
-                </select>
-              </div>
+        <div className={styles.dashboardSplit}>
+          {/* Sidebar Filter Panel - Sticky on Desktop, slide-out drawer on Mobile */}
+          <aside className={`${styles.filterSidebar} ${isMobileFilterOpen ? styles.mobileOpen : ''}`}>
+            <div className={styles.filterSidebarHeader}>
+              <h4 className={styles.filterSidebarTitle}>Penyaringan Data</h4>
+              <button 
+                type="button" 
+                className={styles.closeDrawerBtn} 
+                onClick={() => setIsMobileFilterOpen(false)}
+                aria-label="Tutup filter"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className={styles.filterSidebarContent}>
+              <div className={styles.filterGrid}>
+                {/* Scale selection */}
+                <div className={styles.filterGroup}>
+                  <label htmlFor="period-scale" className={styles.label}>Skala Periode</label>
+                  <select
+                    id="period-scale"
+                    className={styles.input}
+                    value={period}
+                    onChange={(e) => {
+                      const newPeriod = e.target.value as any;
+                      setPeriod(newPeriod);
+                      if ((newPeriod === 'DAILY' || newPeriod === 'WEEKLY') && months.length > 1) {
+                        setMonths([months[0]]);
+                      }
+                    }}
+                  >
+                    <option value="DAILY" disabled={months.length > 1}>Harian (Hari ini)</option>
+                    <option value="WEEKLY" disabled={months.length > 1}>Mingguan (Fase 1-5)</option>
+                    <option value="MONTHLY">Bulanan (Tren Tahun)</option>
+                    <option value="YEARLY">Tahunan (5 Tahun Lalu)</option>
+                  </select>
+                </div>
 
-              {/* Year selector */}
-              <div className={styles.filterGroup}>
-                <label htmlFor="year-select" className={styles.label}>Tahun</label>
-                <select
-                  id="year-select"
-                  className={styles.input}
-                  value={year}
-                  onChange={(e) => setYear(Number(e.target.value))}
-                >
-                  {yearsRange.map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-              </div>
+                {/* Year selector */}
+                <div className={styles.filterGroup}>
+                  <label htmlFor="year-select" className={styles.label}>Tahun</label>
+                  <select
+                    id="year-select"
+                    className={styles.input}
+                    value={year}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                  >
+                    {yearsRange.map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
 
-              {/* Month selector */}
-              {period !== 'YEARLY' ? (
-                <div className={styles.filterGroup} ref={summaryMonthRef}>
-                  <span className={styles.label}>Bulan</span>
-                  <div style={{ position: 'relative', marginTop: 'var(--space-1)' }}>
-                    <button
-                      type="button"
-                      className={styles.dropdownTrigger}
-                      onClick={() => setSummaryMonthOpen(!summaryMonthOpen)}
-                    >
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 'var(--space-2)' }}>
-                        <CalendarIcon size={16} style={{ flexShrink: 0, color: 'var(--color-text-muted)' }} />
-                        <span>
-                          {months.length === 12
-                            ? 'Semua Bulan'
-                            : months.length === 0
-                            ? 'Pilih Bulan'
-                            : months.length <= 3
-                            ? months.map(m => monthsIndo.find(mi => mi.value === m)?.label.substring(0, 3)).join(', ')
-                            : `${months.length} Bulan`}
+                {/* Month selector */}
+                {period !== 'YEARLY' ? (
+                  <div className={styles.filterGroup} ref={summaryMonthRef}>
+                    <span className={styles.label}>Bulan</span>
+                    <div style={{ position: 'relative', marginTop: 'var(--space-1)' }}>
+                      <button
+                        type="button"
+                        className={styles.dropdownTrigger}
+                        onClick={() => setSummaryMonthOpen(!summaryMonthOpen)}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 'var(--space-2)' }}>
+                          <CalendarIcon size={16} style={{ flexShrink: 0, color: 'var(--color-text-muted)' }} />
+                          <span>
+                            {months.length === 12
+                              ? 'Semua Bulan'
+                              : months.length === 0
+                              ? 'Pilih Bulan'
+                              : months.length <= 3
+                              ? months.map(m => monthsIndo.find(mi => mi.value === m)?.label.substring(0, 3)).join(', ')
+                              : `${months.length} Bulan`}
+                          </span>
                         </span>
-                      </span>
-                      <span style={{ fontSize: '9px', color: 'var(--color-text-light)' }}>
-                        {summaryMonthOpen ? '▲' : '▼'}
-                      </span>
-                    </button>
+                        <span style={{ fontSize: '9px', color: 'var(--color-text-light)' }}>
+                          {summaryMonthOpen ? '▲' : '▼'}
+                        </span>
+                      </button>
 
-                    {summaryMonthOpen && (
-                      <div className={styles.dropdownMenu} style={{ minWidth: '200px' }}>
-                        {monthsIndo.map(m => {
-                          const isChecked = months.includes(m.value);
-                          return (
-                            <label key={m.value} className={styles.dropdownItem}>
-                              <input
-                                type="checkbox"
-                                className={styles.dropdownItemInput}
-                                checked={isChecked}
-                                onChange={() => {
-                                  if (period === 'DAILY' || period === 'WEEKLY') {
-                                    setMonths([m.value]);
-                                    setSummaryMonthOpen(false);
-                                  } else {
-                                    setMonths((prev) => {
-                                      if (prev.includes(m.value)) {
-                                        if (prev.length === 1) return prev;
-                                        return prev.filter(v => v !== m.value);
+                      {summaryMonthOpen && (
+                        <div className={styles.dropdownMenu} style={{ minWidth: '200px' }}>
+                          {monthsIndo.map(m => {
+                            const isChecked = months.includes(m.value);
+                            return (
+                              <label key={m.value} className={styles.dropdownItem}>
+                                <input
+                                  type="checkbox"
+                                  className={styles.dropdownItemInput}
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    if (period === 'DAILY' || period === 'WEEKLY') {
+                                      setMonths([m.value]);
+                                      setSummaryMonthOpen(false);
+                                    } else {
+                                      setMonths((prev) => {
+                                        if (prev.includes(m.value)) {
+                                          if (prev.length === 1) return prev;
+                                          return prev.filter(v => v !== m.value);
+                                        } else {
+                                          return [...prev, m.value].sort((a, b) => a - b);
+                                        }
+                                      });
+                                    }
+                                  }}
+                                />
+                                <span>{m.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.filterGroup}>
+                    <span className={styles.label}>Bulan Terkunci</span>
+                    <input type="text" className={styles.input} style={{ marginTop: 'var(--space-1)' }} value="Semua Bulan" disabled />
+                  </div>
+                )}
+
+                {/* Branch selector */}
+                {user.role === 'SUPERADMIN' ? (
+                  <div className={styles.filterGroup} ref={summaryBranchRef}>
+                    <span className={styles.label}>Penyaringan Cabang</span>
+                    <div style={{ position: 'relative', marginTop: 'var(--space-1)' }}>
+                      <button
+                        type="button"
+                        className={styles.dropdownTrigger}
+                        onClick={() => setSummaryBranchOpen(!summaryBranchOpen)}
+                      >
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 'var(--space-2)' }}>
+                          {branchIds.length === 0
+                            ? 'Semua Cabang'
+                            : branchIds.length === branches.length
+                            ? 'Semua Cabang'
+                            : `${branchIds.length} Cabang`}
+                        </span>
+                        <span style={{ fontSize: '9px', color: 'var(--color-text-light)' }}>
+                          {summaryBranchOpen ? '▲' : '▼'}
+                        </span>
+                      </button>
+
+                      {summaryBranchOpen && (
+                        <div className={styles.dropdownMenu} style={{ minWidth: '220px' }}>
+                          <label className={styles.dropdownItem}>
+                            <input
+                              type="checkbox"
+                              className={styles.dropdownItemInput}
+                              checked={branchIds.length === 0}
+                              onChange={() => setBranchIds([])}
+                            />
+                            <strong>Semua Cabang</strong>
+                          </label>
+                          {branches.map(b => {
+                            const isChecked = branchIds.includes(b.id);
+                            return (
+                              <label key={b.id} className={styles.dropdownItem}>
+                                <input
+                                  type="checkbox"
+                                  className={styles.dropdownItemInput}
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    setBranchIds((prev) => {
+                                      if (prev.includes(b.id)) {
+                                        return prev.filter(v => v !== b.id);
                                       } else {
-                                        return [...prev, m.value].sort((a, b) => a - b);
+                                        return [...prev, b.id].sort((a, b) => a - b);
                                       }
                                     });
-                                  }
-                                }}
-                              />
-                              <span>{m.label}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className={styles.filterGroup}>
-                  <span className={styles.label}>Bulan Terkunci</span>
-                  <input type="text" className={styles.input} style={{ marginTop: 'var(--space-1)' }} value="Semua Bulan" disabled />
-                </div>
-              )}
-
-              {/* Branch selector */}
-              {user.role === 'SUPERADMIN' ? (
-                <div className={styles.filterGroup} ref={summaryBranchRef}>
-                  <span className={styles.label}>Penyaringan Cabang</span>
-                  <div style={{ position: 'relative', marginTop: 'var(--space-1)' }}>
-                    <button
-                      type="button"
-                      className={styles.dropdownTrigger}
-                      onClick={() => setSummaryBranchOpen(!summaryBranchOpen)}
-                    >
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 'var(--space-2)' }}>
-                        {branchIds.length === 0
-                          ? 'Semua Cabang'
-                          : branchIds.length === branches.length
-                          ? 'Semua Cabang'
-                          : `${branchIds.length} Cabang`}
-                      </span>
-                      <span style={{ fontSize: '9px', color: 'var(--color-text-light)' }}>
-                        {summaryBranchOpen ? '▲' : '▼'}
-                      </span>
-                    </button>
-
-                    {summaryBranchOpen && (
-                      <div className={styles.dropdownMenu} style={{ minWidth: '220px' }}>
-                        <label className={styles.dropdownItem}>
-                          <input
-                            type="checkbox"
-                            className={styles.dropdownItemInput}
-                            checked={branchIds.length === 0}
-                            onChange={() => setBranchIds([])}
-                          />
-                          <strong>Semua Cabang</strong>
-                        </label>
-                        {branches.map(b => {
-                          const isChecked = branchIds.includes(b.id);
-                          return (
-                            <label key={b.id} className={styles.dropdownItem}>
-                              <input
-                                type="checkbox"
-                                className={styles.dropdownItemInput}
-                                checked={isChecked}
-                                onChange={() => {
-                                  setBranchIds((prev) => {
-                                    if (prev.includes(b.id)) {
-                                      return prev.filter(v => v !== b.id);
-                                    } else {
-                                      return [...prev, b.id].sort((a, b) => a - b);
-                                    }
-                                  });
-                                }}
-                              />
-                              <span>{b.name}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className={styles.filterGroup}>
-                  <span className={styles.label}>Cabang Terkunci</span>
-                  <input
-                    type="text"
-                    className={styles.input}
-                    style={{ marginTop: 'var(--space-1)' }}
-                    value={user.branchId ? branches.find(b => b.id === user.branchId)?.name || 'Cabang Terdaftar' : '-'}
-                    disabled
-                  />
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* KPI Stats Section */}
-          {report && (
-            <section className={styles.kpiGrid}>
-              <div className={styles.kpiCard}>
-                <div className={styles.kpiIcon}>
-                  <Wallet size={22} />
-                </div>
-                <div className={styles.kpiContent}>
-                  <p className={styles.kpiLabel}>Total Pengeluaran</p>
-                  <h3 className={styles.kpiValue}>{formatRupiah(report.totalSpending)}</h3>
-                </div>
-              </div>
-
-              <div className={styles.kpiCard}>
-                <div className={`${styles.kpiIcon} ${styles.kpiIconSuccess}`}>
-                  <Receipt size={22} />
-                </div>
-                <div className={styles.kpiContent}>
-                  <p className={styles.kpiLabel}>Jumlah Transaksi</p>
-                  <h3 className={styles.kpiValue}>{report.transactionCount} Catatan</h3>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Main Charts Dashboard */}
-          {error && (
-            <div style={{ padding: 'var(--space-6)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', color: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-              <AlertCircle size={20} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {loading ? (
-            <div className={styles.loadingOverlay}>
-              <div className={styles.spinner} />
-            </div>
-          ) : report ? (
-            <section className={styles.chartsGrid}>
-              
-              {/* Line Chart: Trend */}
-              <div className={styles.chartCard}>
-                <h3 className={styles.chartTitle}>
-                  <TrendingUp size={16} />
-                  <span>Tren Pengeluaran GA</span>
-                </h3>
-                <div className={styles.chartFrame}>
-                  {report.trendData.length === 0 || report.totalSpending === 0 ? (
-                    <div className={styles.chartFrameEmpty}>
-                      Tidak ada data tren untuk divisualisasikan.
-                    </div>
-                  ) : mounted ? (
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                      <LineChart data={report.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                        <XAxis dataKey="label" stroke="#94A3B8" fontSize={11} tickLine={false} />
-                        <YAxis 
-                          stroke="#94A3B8" 
-                          fontSize={11} 
-                          tickLine={false} 
-                          tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}Jt` : val}
-                        />
-                        <Tooltip 
-                          formatter={(value) => [formatRupiah(Number(value)), 'Total Biaya']}
-                          contentStyle={{ background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '12px' }}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="total" 
-                          stroke="var(--color-primary)" 
-                          strokeWidth={3} 
-                          dot={{ r: 4, stroke: 'var(--color-primary)', strokeWidth: 2, fill: '#FFF' }}
-                          activeDot={{ r: 6 }} 
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* Donut Chart: Categories */}
-              <div className={styles.chartCard}>
-                <h3 className={styles.chartTitle}>
-                  <PieIcon size={16} />
-                  <span>Proporsi Pengeluaran Kategori</span>
-                </h3>
-                <div className={styles.chartFrame} style={{ height: '180px' }}>
-                  {report.byCategory.length === 0 || report.totalSpending === 0 ? (
-                    <div className={styles.chartFrameEmpty}>
-                      Belum ada data proporsi.
-                    </div>
-                  ) : mounted ? (
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                      <RechartsPieChart>
-                        <Pie
-                          data={report.byCategory}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={45}
-                          outerRadius={70}
-                          paddingAngle={4}
-                          dataKey="total"
-                          onClick={(data: any) => {
-                            if (data && data.id) {
-                              const found = report.byCategory.find(c => c.id === data.id);
-                              if (found) setSelectedCategory(found);
-                            }
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        >
-                          {report.byCategory.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => formatRupiah(Number(value))} />
-                      </RechartsPieChart>
-                    </ResponsiveContainer>
-                  ) : null}
-                </div>
- 
-                {report.byCategory.length > 0 && report.totalSpending > 0 && (
-                  !selectedCategory ? (
-                    <>
-                      <div className={styles.donutBreakdownRow}>
-                        {report.byCategory.map((cat, idx) => (
-                          <div 
-                            key={cat.id} 
-                            className={styles.breakdownItem}
-                            onClick={() => setSelectedCategory(cat)}
-                            style={{ cursor: 'pointer' }}
-                            title={`Klik untuk melihat sub-kategori ${cat.name}`}
-                          >
-                            <span className={styles.breakdownLabel}>
-                              <span 
-                                className={styles.dot} 
-                                style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }} 
-                              />
-                              <span style={{ textDecoration: 'underline', textDecorationStyle: 'dotted' }}>{cat.name}</span>
-                            </span>
-                            <span className={styles.breakdownValue}>
-                              {cat.percentage}% ({formatRupiah(cat.total)})
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '8px' }}>
-                        * Tip: Klik kategori di atas untuk melihat sub-kategori.
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid #E2E8F0' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#1E293B' }}>
-                          Sub-kategori: {selectedCategory.name}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedCategory(null)}
-                          style={{
-                            padding: '3px 8px',
-                            fontSize: '11px',
-                            backgroundColor: '#E2E8F0',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            color: '#1E293B',
-                            fontWeight: 500
-                          }}
-                        >
-                          &larr; Kembali
-                        </button>
-                      </div>
-                      <div className={styles.donutBreakdownRow} style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                        {selectedCategory.subCategories.length === 0 ? (
-                          <div style={{ textAlign: 'center', fontSize: '12px', color: '#94A3B8', padding: '12px', width: '100%' }}>
-                            Tidak ada rincian sub-kategori.
-                          </div>
-                        ) : (
-                          selectedCategory.subCategories.map((sub, idx) => (
-                            <div key={sub.id} className={styles.breakdownItem}>
-                              <span className={styles.breakdownLabel}>
-                                <span 
-                                  className={styles.dot} 
-                                  style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }} 
+                                  }}
                                 />
-                                <span>{sub.name}</span>
-                              </span>
-                              <span className={styles.breakdownValue}>
-                                {sub.percentage}% ({formatRupiah(sub.total)})
-                              </span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </>
-                  )
+                                <span>{b.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.filterGroup}>
+                    <span className={styles.label}>Cabang Terkunci</span>
+                    <input
+                      type="text"
+                      className={styles.input}
+                      style={{ marginTop: 'var(--space-1)' }}
+                      value={user.branchId ? branches.find(b => b.id === user.branchId)?.name || 'Cabang Terdaftar' : '-'}
+                      disabled
+                    />
+                  </div>
                 )}
               </div>
+            </div>
+          </aside>
 
-              {/* Stacked Area Chart: Category Trend (All Roles) */}
-              <div className={`${styles.chartCard} ${styles.chartCardFull}`}>
-                <h3 className={styles.chartTitle}>
-                  <TrendingUp size={16} />
-                  <span>Tren Komposisi Pengeluaran Kategori</span>
-                </h3>
-                <div className={styles.chartFrame} style={{ height: '260px' }}>
-                  {report.trendData.length === 0 || report.totalSpending === 0 ? (
-                    <div className={styles.chartFrameEmpty}>
-                      Tidak ada data komposisi tren untuk divisualisasikan.
-                    </div>
-                  ) : mounted ? (
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                      <AreaChart data={report.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                        <XAxis dataKey="label" stroke="#94A3B8" fontSize={11} tickLine={false} />
-                        <YAxis 
-                          stroke="#94A3B8" 
-                          fontSize={11} 
-                          tickLine={false} 
-                          tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}Jt` : val}
-                        />
-                        <Tooltip 
-                          formatter={(value, name) => [formatRupiah(Number(value)), name]}
-                          contentStyle={{ background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '12px' }}
-                        />
-                        <Legend iconSize={10} iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                        {report.byCategory.map((cat, index) => (
-                          <Area
-                            key={cat.id}
-                            type="monotone"
-                            dataKey={cat.name}
-                            stackId="1"
-                            stroke={CHART_COLORS[index % CHART_COLORS.length]}
-                            fill={CHART_COLORS[index % CHART_COLORS.length]}
-                            fillOpacity={0.4}
-                          />
-                        ))}
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  ) : null}
+          {/* Mobile Overlay Backdrop */}
+          {isMobileFilterOpen && (
+            <div className={styles.mobileBackdrop} onClick={() => setIsMobileFilterOpen(false)} />
+          )}
+
+          {/* Main Dashboard Content Area */}
+          <div className={styles.chartsPanel}>
+            {/* Mobile Filter Toggle Button */}
+            <button 
+              type="button"
+              className={styles.mobileFilterToggle} 
+              onClick={() => setIsMobileFilterOpen(true)}
+            >
+              <SlidersHorizontal size={16} />
+              <span>Filter Data</span>
+            </button>
+
+            {/* KPI Stats Section */}
+            {report && (
+              <section className={styles.kpiGrid}>
+                <div className={styles.kpiCard}>
+                  <div className={styles.kpiIcon}>
+                    <Wallet size={22} />
+                  </div>
+                  <div className={styles.kpiContent}>
+                    <p className={styles.kpiLabel}>Total Pengeluaran</p>
+                    <h3 className={styles.kpiValue}>{formatRupiah(report.totalSpending)}</h3>
+                  </div>
                 </div>
+
+                <div className={styles.kpiCard}>
+                  <div className={`${styles.kpiIcon} ${styles.kpiIconSuccess}`}>
+                    <Receipt size={22} />
+                  </div>
+                  <div className={styles.kpiContent}>
+                    <p className={styles.kpiLabel}>Jumlah Transaksi</p>
+                    <h3 className={styles.kpiValue}>{report.transactionCount} Catatan</h3>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Main Charts Dashboard */}
+            {error && (
+              <div style={{ padding: 'var(--space-6)', backgroundColor: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', color: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                <AlertCircle size={20} />
+                <span>{error}</span>
               </div>
-            </section>
-          ) : null}
-        </>
+            )}
+            {loading && !report && (
+              <div className={styles.loadingOverlay}>
+                <div className={styles.spinner} />
+              </div>
+            )}
+
+            {report && (
+              <div style={{ position: 'relative', width: '100%' }}>
+                {loading && (
+                  <div className={styles.loadingOverlayAbsolute}>
+                    <div className={styles.spinner} />
+                  </div>
+                )}
+                
+                <section 
+                  className={styles.chartsGrid}
+                  style={{
+                    opacity: loading ? 0.35 : 1,
+                    pointerEvents: loading ? 'none' : 'auto',
+                    transition: 'opacity 0.15s ease-in-out'
+                  }}
+                >
+                  
+                  {/* Line Chart: Trend */}
+                  <div className={styles.chartCard}>
+                    <h3 className={styles.chartTitle}>
+                      <TrendingUp size={16} />
+                      <span>Tren Pengeluaran GA</span>
+                    </h3>
+                    <div className={styles.chartFrame}>
+                      {report.trendData.length === 0 || report.totalSpending === 0 ? (
+                        <div className={styles.chartFrameEmpty}>
+                          Tidak ada data tren untuk divisualisasikan.
+                        </div>
+                      ) : mounted ? (
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                          <LineChart data={report.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                            <XAxis dataKey="label" stroke="#94A3B8" fontSize={11} tickLine={false} />
+                            <YAxis 
+                              stroke="#94A3B8" 
+                              fontSize={11} 
+                              tickLine={false} 
+                              tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}Jt` : val}
+                            />
+                            <Tooltip 
+                              formatter={(value) => [formatRupiah(Number(value)), 'Total Biaya']}
+                              contentStyle={{ background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '12px' }}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="total" 
+                              stroke="var(--color-primary)" 
+                              strokeWidth={3} 
+                              dot={{ r: 4, stroke: 'var(--color-primary)', strokeWidth: 2, fill: '#FFF' }}
+                              activeDot={{ r: 6 }} 
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* Donut Chart: Categories */}
+                  <div className={styles.chartCard}>
+                    <h3 className={styles.chartTitle}>
+                      <PieIcon size={16} />
+                      <span>Proporsi Pengeluaran Kategori</span>
+                    </h3>
+                    <div className={styles.chartFrame} style={{ height: '180px' }}>
+                      {report.byCategory.length === 0 || report.totalSpending === 0 ? (
+                        <div className={styles.chartFrameEmpty}>
+                          Belum ada data proporsi.
+                        </div>
+                      ) : mounted ? (
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                          <RechartsPieChart>
+                            <Pie
+                              data={report.byCategory}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={45}
+                              outerRadius={70}
+                              paddingAngle={4}
+                              dataKey="total"
+                              onClick={(data: any) => {
+                                if (data && data.id) {
+                                  const found = report.byCategory.find(c => c.id === data.id);
+                                  if (found) setSelectedCategory(found);
+                                }
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              {report.byCategory.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value) => formatRupiah(Number(value))} />
+                          </RechartsPieChart>
+                        </ResponsiveContainer>
+                      ) : null}
+                    </div>
+     
+                    {report.byCategory.length > 0 && report.totalSpending > 0 && (
+                      !selectedCategory ? (
+                        <>
+                          <div className={styles.donutBreakdownRow}>
+                            {report.byCategory.map((cat, idx) => (
+                              <div 
+                                key={cat.id} 
+                                className={styles.breakdownItem}
+                                onClick={() => setSelectedCategory(cat)}
+                                style={{ cursor: 'pointer' }}
+                                title={`Klik untuk melihat sub-kategori ${cat.name}`}
+                              >
+                                <span className={styles.breakdownLabel}>
+                                  <span 
+                                    className={styles.dot} 
+                                    style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }} 
+                                  />
+                                  <span style={{ textDecoration: 'underline', textDecorationStyle: 'dotted' }}>{cat.name}</span>
+                                </span>
+                                <span className={styles.breakdownValue}>
+                                  {cat.percentage}% ({formatRupiah(cat.total)})
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '8px' }}>
+                            * Tip: Klik kategori di atas untuk melihat sub-kategori.
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid #E2E8F0' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#1E293B' }}>
+                              Sub-kategori: {selectedCategory.name}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCategory(null)}
+                              style={{
+                                padding: '3px 8px',
+                                fontSize: '11px',
+                                backgroundColor: '#E2E8F0',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                color: '#1E293B',
+                                fontWeight: 500
+                              }}
+                            >
+                              &larr; Kembali
+                            </button>
+                          </div>
+                          <div className={styles.donutBreakdownRow} style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                            {selectedCategory.subCategories.length === 0 ? (
+                              <div style={{ textAlign: 'center', fontSize: '12px', color: '#94A3B8', padding: '12px', width: '100%' }}>
+                                Tidak ada rincian sub-kategori.
+                              </div>
+                            ) : (
+                              selectedCategory.subCategories.map((sub, idx) => (
+                                <div key={sub.id} className={styles.breakdownItem}>
+                                  <span className={styles.breakdownLabel}>
+                                    <span 
+                                      className={styles.dot} 
+                                      style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }} 
+                                    />
+                                    <span>{sub.name}</span>
+                                  </span>
+                                  <span className={styles.breakdownValue}>
+                                    {sub.percentage}% ({formatRupiah(sub.total)})
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </>
+                      )
+                    )}
+                  </div>
+
+                  {/* Stacked Area Chart: Category Trend (All Roles) */}
+                  <div className={`${styles.chartCard} ${styles.chartCardFull}`}>
+                    <h3 className={styles.chartTitle}>
+                      <TrendingUp size={16} />
+                      <span>Tren Komposisi Pengeluaran Kategori</span>
+                    </h3>
+                    <div className={styles.chartFrame} style={{ height: '260px' }}>
+                      {report.trendData.length === 0 || report.totalSpending === 0 ? (
+                        <div className={styles.chartFrameEmpty}>
+                          Tidak ada data komposisi tren untuk divisualisasikan.
+                        </div>
+                      ) : mounted ? (
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                          <AreaChart data={report.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                            <XAxis dataKey="label" stroke="#94A3B8" fontSize={11} tickLine={false} />
+                            <YAxis 
+                              stroke="#94A3B8" 
+                              fontSize={11} 
+                              tickLine={false} 
+                              tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}Jt` : val}
+                            />
+                            <Tooltip 
+                              formatter={(value, name) => [formatRupiah(Number(value)), name]}
+                              contentStyle={{ background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '12px' }}
+                            />
+                            <Legend iconSize={10} iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                            {report.byCategory.map((cat, index) => (
+                              <Area
+                                key={cat.id}
+                                type="monotone"
+                                dataKey={cat.name}
+                                stackId="1"
+                                stroke={CHART_COLORS[index % CHART_COLORS.length]}
+                                fill={CHART_COLORS[index % CHART_COLORS.length]}
+                                fillOpacity={0.4}
+                              />
+                            ))}
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* Bar Chart: Branch Spending Distribution (Superadmin Only) */}
+                  {user.role === 'SUPERADMIN' && report.byBranch.length > 0 && (
+                    <div className={`${styles.chartCard} ${styles.chartCardFull}`}>
+                      <h3 className={styles.chartTitle}>
+                        <BarChart3 size={16} />
+                        <span>Distribusi Pengeluaran Per Cabang</span>
+                      </h3>
+                      <div className={styles.chartFrame} style={{ height: `${Math.max(220, report.byBranch.length * 45)}px` }}>
+                        {mounted ? (
+                          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                            <RechartsBarChart
+                              layout="vertical"
+                              data={report.byBranch}
+                              margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                              <XAxis 
+                                type="number" 
+                                stroke="#94A3B8" 
+                                fontSize={11} 
+                                tickLine={false} 
+                                tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}Jt` : val} 
+                              />
+                              <YAxis 
+                                type="category" 
+                                dataKey="code" 
+                                stroke="#94A3B8" 
+                                fontSize={11} 
+                                tickLine={false} 
+                                width={50}
+                              />
+                              <Tooltip 
+                                labelFormatter={(label) => {
+                                  const found = report.byBranch.find(b => b.code === label);
+                                  return found ? `${found.name} (${label})` : label;
+                                }}
+                                formatter={(value) => [formatRupiah(Number(value)), 'Total Pengeluaran']}
+                                contentStyle={{ background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '12px' }}
+                              />
+                              <Bar dataKey="total" radius={[0, 4, 4, 0]}>
+                                {report.byBranch.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                ))}
+                              </Bar>
+                            </RechartsBarChart>
+                          </ResponsiveContainer>
+                        ) : null}
+                      </div>
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ============================================================

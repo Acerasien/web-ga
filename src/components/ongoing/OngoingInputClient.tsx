@@ -14,12 +14,13 @@ import {
 } from 'lucide-react';
 import { createOngoingPayment } from '@/lib/actions/ongoing';
 import type { AuthUser } from '@/types';
-import type { Category, Branch } from '@prisma/client';
+import type { Branch } from '@prisma/client';
+import type { CategoryWithSub } from '@/lib/actions/categories';
 import styles from '@/app/(dashboard)/transaksi/input/input.module.css';
 
 interface OngoingInputClientProps {
   user: AuthUser;
-  categories: Category[];
+  categories: CategoryWithSub[];
   branches: Branch[];
 }
 
@@ -32,6 +33,16 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
     user.role === 'ADMIN' && user.branchId ? String(user.branchId) : ''
   );
   const [categoryId, setCategoryId] = useState<string>('');
+  const [subCategoryId, setSubCategoryId] = useState<string>('');
+
+  const selectedCategory = categories.find(c => c.id === Number(categoryId));
+  const subCategories = selectedCategory?.subCategories || [];
+
+  const handleCategoryChange = (val: string) => {
+    setCategoryId(val);
+    setSubCategoryId('');
+    setFormError(null);
+  };
   const [description, setDescription] = useState<string>('');
   const [amountNeeded, setAmountNeeded] = useState<string>('');
   const [receiptPath, setReceiptPath] = useState<string>('');
@@ -125,6 +136,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
 
     const parsedBranchId = user.role === 'ADMIN' ? user.branchId! : Number(branchId);
     const parsedCategoryId = Number(categoryId);
+    const parsedSubCategoryId = subCategoryId ? Number(subCategoryId) : undefined;
     const parsedAmount = parseFloat(amountNeeded.replace(/[^0-9]/g, ''));
 
     if (!parsedBranchId) {
@@ -145,15 +157,16 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
     }
 
     // Direct submit
-    executeSubmit(parsedBranchId, parsedCategoryId, parsedAmount);
+    executeSubmit(parsedBranchId, parsedCategoryId, parsedSubCategoryId, parsedAmount);
   };
 
-  const executeSubmit = (parsedBranchId: number, parsedCategoryId: number, parsedAmount: number) => {
+  const executeSubmit = (parsedBranchId: number, parsedCategoryId: number, parsedSubCategoryId: number | undefined, parsedAmount: number) => {
     startTransition(async () => {
       try {
         const res = await createOngoingPayment({
           branchId: parsedBranchId,
           categoryId: parsedCategoryId,
+          subCategoryId: parsedSubCategoryId,
           description: description.trim(),
           amountNeeded: parsedAmount,
           initialReceiptPath: receiptPath || undefined,
@@ -178,6 +191,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
 
   const handleReset = () => {
     setCategoryId('');
+    setSubCategoryId('');
     if (user.role !== 'ADMIN') setBranchId('');
     setDescription('');
     setAmountNeeded('');
@@ -261,13 +275,35 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
                 id="categoryId"
                 className={styles.input}
                 value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
+                onChange={(e) => handleCategoryChange(e.target.value)}
                 disabled={isPending}
                 required
               >
                 <option value="">-- Pilih Kategori --</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="subCategoryId" className={styles.label}>Sub-Kategori (Opsional)</label>
+              <select
+                id="subCategoryId"
+                className={styles.input}
+                value={subCategoryId}
+                onChange={(e) => setSubCategoryId(e.target.value)}
+                disabled={isPending || !categoryId || subCategories.length === 0}
+              >
+                <option value="">
+                  {!categoryId
+                    ? '-- Pilih Kategori Terlebih Dahulu --'
+                    : subCategories.length === 0
+                      ? '-- Tidak ada sub-kategori --'
+                      : '-- Pilih Sub-Kategori --'}
+                </option>
+                {subCategories.map((sub) => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
                 ))}
               </select>
             </div>

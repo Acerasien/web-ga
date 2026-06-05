@@ -20,6 +20,7 @@ export async function proxy(request: NextRequest) {
   const isProtectedPath =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/transaksi') ||
+    pathname.startsWith('/ongoing') ||
     pathname.startsWith('/laporan') ||
     pathname.startsWith('/admin');
 

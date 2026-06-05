@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/actions/auth';
 import type { ApiResponse } from '@/types';
 import { Prisma, PaymentMethod } from '@prisma/client';
-import type { OngoingPayment, Category, Branch } from '@prisma/client';
+import type { OngoingPayment, Category, SubCategory, Branch } from '@prisma/client';
 
 // ============================================================
 // Types
@@ -15,6 +15,7 @@ export interface OngoingPaymentWithRelations extends Omit<OngoingPayment, 'amoun
   amountNeeded: number;
   actualAmount: number | null;
   category: Category;
+  subCategory?: SubCategory | null;
   branch: Branch;
   user: {
     fullName: string;
@@ -111,6 +112,7 @@ export async function getOngoingPayments(
         include: {
           branch: true,
           category: true,
+          subCategory: true,
           user: {
             select: {
               fullName: true,
@@ -159,6 +161,7 @@ export async function getOngoingPayments(
 export async function createOngoingPayment(data: {
   branchId?: number;
   categoryId: number;
+  subCategoryId?: number;
   description: string;
   amountNeeded: number;
   initialReceiptPath?: string;
@@ -196,6 +199,7 @@ export async function createOngoingPayment(data: {
       data: {
         branchId: targetBranchId,
         categoryId: Number(data.categoryId),
+        subCategoryId: data.subCategoryId ? Number(data.subCategoryId) : null,
         userId: user.id,
         description: data.description.trim(),
         amountNeeded: new Prisma.Decimal(data.amountNeeded),
@@ -345,6 +349,7 @@ export async function realizeOngoingPayment(
           branchId: payment.branchId,
           userId: payment.userId, // Maintain original creator
           categoryId: payment.categoryId,
+          subCategoryId: payment.subCategoryId,
           transactionDate: txDate,
           description: `[Realisasi] ${payment.description.trim()}`,
           quantity: new Prisma.Decimal(1),

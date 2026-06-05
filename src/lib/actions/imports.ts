@@ -65,10 +65,34 @@ function parseCSVDate(dateStr: string): Date {
     if (parts.length === 3) {
       // Case 1: YYYY/MM/DD or YYYY-MM-DD
       if (parts[0].length === 4) {
-        return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        const year = Number(parts[0]);
+        const monthVal = Number(parts[1]);
+        const dayVal = Number(parts[2]);
+        
+        if (monthVal >= 1 && monthVal <= 12 && dayVal >= 1 && dayVal <= 31) {
+          const parsedDate = new Date(Date.UTC(year, monthVal - 1, dayVal));
+          if (!isNaN(parsedDate.getTime())) {
+            return parsedDate;
+          }
+        }
       }
-      // Case 2: DD/MM/YYYY or DD-MM-YYYY (assume standard Indonesian format)
-      return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+      
+      // Case 2: DD/MM/YYYY or DD-MM-YYYY or DD/MM/YY or DD-MM-YY (assume standard Indonesian format)
+      let year = Number(parts[2]);
+      if (!isNaN(year)) {
+        if (year < 100) {
+          year += year < 50 ? 2000 : 1900;
+        }
+        const monthVal = Number(parts[1]);
+        const dayVal = Number(parts[0]);
+        
+        if (monthVal >= 1 && monthVal <= 12 && dayVal >= 1 && dayVal <= 31) {
+          const parsedDate = new Date(Date.UTC(year, monthVal - 1, dayVal));
+          if (!isNaN(parsedDate.getTime())) {
+            return parsedDate;
+          }
+        }
+      }
     }
   }
   
@@ -76,7 +100,14 @@ function parseCSVDate(dateStr: string): Date {
   if (isNaN(parsed.getTime())) {
     throw new Error(`Format tanggal '${dateStr}' tidak valid.`);
   }
-  return parsed;
+  
+  // Convert local/parsed Date to UTC Date by extracting its date-only components
+  const isISO = /^\d{4}-\d{2}-\d{2}/.test(trimmed);
+  const year = isISO ? parsed.getUTCFullYear() : parsed.getFullYear();
+  const month = isISO ? parsed.getUTCMonth() : parsed.getMonth();
+  const day = isISO ? parsed.getUTCDate() : parsed.getDate();
+  
+  return new Date(Date.UTC(year, month, day));
 }
 
 /**
