@@ -1,6 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import PDFExportModal from '../modals/PDFExportModal';
+import PDFPrintTemplate from './PDFPrintTemplate';
 import * as XLSX from 'xlsx';
 import { 
   Wallet, 
@@ -10,9 +15,9 @@ import {
   PieChart as PieIcon, 
   BarChart3, 
   Download, 
-  Upload,
   AlertCircle,
   FileSpreadsheet,
+  FileText,
   SlidersHorizontal,
   X
 } from 'lucide-react';
@@ -39,7 +44,6 @@ import type { ReportPayload, ComparisonDataPoint, ComparisonPeriod, CategoryBrea
 import { getTransactions } from '@/lib/actions/transactions';
 import { getCategoriesWithSub } from '@/lib/actions/categories';
 import type { CategoryWithSub } from '@/lib/actions/categories';
-import Link from 'next/link';
 import type { Branch } from '@prisma/client';
 import type { AuthUser } from '@/types';
 import styles from '@/app/(dashboard)/laporan/reports.module.css';
@@ -51,14 +55,20 @@ interface LaporanClientProps {
 
 // Gorgeous, harmonized professional color palette (Tailwind tailored)
 const CHART_COLORS = [
-  '#3B82F6', // var(--color-primary)
-  '#10B981', // var(--color-success)
-  '#F97316', // var(--color-accent)
+  '#3B82F6', // Blue
+  '#10B981', // Emerald
+  '#F97316', // Orange
   '#8B5CF6', // Purple
   '#EC4899', // Pink
   '#06B6D4', // Cyan
   '#F59E0B', // Amber
-  '#E2E8F0'  // Light Gray fallback
+  '#EF4444', // Red
+  '#14B8A6', // Teal
+  '#6366F1', // Indigo
+  '#F43F5E', // Rose
+  '#84CC16', // Lime
+  '#A855F7', // Violet
+  '#EAB308', // Yellow
 ];
 
 export default function LaporanClient({ user, branches }: LaporanClientProps) {
@@ -110,6 +120,12 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
   // CSV utilities states
   const [exporting, setExporting] = useState<boolean>(false);
   const [mounted, setMounted] = useState<boolean>(false);
+
+  // PDF Export states
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState<boolean>(false);
+  const [pdfGenerating, setPdfGenerating] = useState<boolean>(false);
+  const [pdfTransactions, setPdfTransactions] = useState<any[]>([]);
+  const pdfPrintRef = useRef<HTMLDivElement>(null);
 
   const [branchDropdownOpen, setBranchDropdownOpen] = useState<boolean>(false);
   const branchDropdownRef = useRef<HTMLDivElement>(null);
@@ -172,7 +188,6 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
 
   // Fetch comparison data dynamically
   const loadComparisonData = async () => {
-    if (activeTab !== 'COMPARISON') return;
     setCompLoading(true);
     setCompError(null);
     try {
@@ -206,7 +221,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
 
   useEffect(() => {
     loadComparisonData();
-  }, [activeTab, compPeriods, compareType, compCategoryIds]);
+  }, [compPeriods, compareType, compCategoryIds]);
 
   const togglePeriod = (yearVal: number, monthVal: number) => {
     setCompPeriods((prev) => {
@@ -528,6 +543,106 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
     }
   };
 
+  const handleGeneratePDF = async (includeDetails: boolean) => {
+    if (pdfGenerating) return;
+    setPdfGenerating(true);
+    
+    try {
+      if (includeDetails) {
+        // Determine date ranges for the search query to fetch detailed transactions
+        let startDateStr: string | undefined = undefined;
+        let endDateStr: string | undefined = undefined;
+
+        if (period === 'YEARLY') {
+          startDateStr = `${year - 4}-01-01`;
+          endDateStr = `${year}-12-31`;
+        } else {
+          const minMonth = Math.min(...months);
+          const maxMonth = Math.max(...months);
+          const daysInMaxMonth = new Date(year, maxMonth, 0).getDate();
+          const formattedMinMonth = String(minMonth).padStart(2, '0');
+          const formattedMaxMonth = String(maxMonth).padStart(2, '0');
+          startDateStr = `${year}-${formattedMinMonth}-01`;
+          endDateStr = `${year}-${formattedMaxMonth}-${daysInMaxMonth}`;
+        }
+
+        const result = await getTransactions({
+          branchId: undefined,
+          startDate: startDateStr,
+          endDate: endDateStr,
+          page: 1,
+          limit: 10000 
+        });
+
+        if (result.success && result.data) {
+          let exportedTxs = result.data.transactions;
+          if (period !== 'YEARLY' && months.length > 0) {
+            exportedTxs = exportedTxs.filter(tx => months.includes(new Date(tx.transactionDate).getMonth() + 1));
+          }
+          if (branchIds.length > 0) {
+            exportedTxs = exportedTxs.filter(tx => branchIds.includes(tx.branchId));
+          } else if (user.role !== 'SUPERADMIN' && user.branchId) {
+            exportedTxs = exportedTxs.filter(tx => tx.branchId === user.branchId);
+          }
+          
+          // Force synchronous React state update so the template renders the table immediately
+          flushSync(() => {
+            setPdfTransactions(exportedTxs);
+          });
+        }
+      } else {
+        flushSync(() => {
+          setPdfTransactions([]);
+        });
+      }
+
+      // Small delay to ensure Recharts charts and DOM in hidden template have completed their static layout
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      if (!pdfPrintRef.current) throw new Error("Template PDF tidak ditemukan.");
+
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: 'a4' // A4 landscape is approx 841 x 595 points (mapped to our 1120x790 pixel aspect ratio)
+      });
+      
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      // Find all page containers inside the hidden layout
+      const pages = pdfPrintRef.current.querySelectorAll('.pdf-page');
+      
+      for (let i = 0; i < pages.length; i++) {
+        const pageElement = pages[i] as HTMLElement;
+        const canvas = await html2canvas(pageElement, {
+          scale: 2, // High resolution
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff'
+        });
+        
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        
+        if (i > 0) {
+          pdf.addPage();
+        }
+        
+        // Scale canvas to fit exactly within the PDF page dimensions
+        pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight);
+      }
+
+      pdf.save(`Laporan_GA_${period}_${year}_months.pdf`);
+
+    } catch (error) {
+      console.error('PDF Generation Error:', error);
+      alert('Terjadi kesalahan saat menghasilkan PDF.');
+    } finally {
+      setPdfGenerating(false);
+      setIsPdfModalOpen(false);
+    }
+  };
+
   return (
     <div className={styles.container}>
       {/* Header Block */}
@@ -537,53 +652,82 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
           <p className="text-muted" style={{ margin: 0 }}>Analisis pengeluaran General Affairs dengan grafis interaktif dan utilitas import/export.</p>
         </div>
         
-        {/* Excel & CSV Import/Export Buttons - Only displayed in Summary Tab */}
-        {activeTab === 'SUMMARY' && (
-          <div className={styles.actionsRow}>
-            <button 
-              type="button" 
-              onClick={handleExportExcel} 
-              className={`${styles.actionBtn} ${styles.exportBtn}`}
-              disabled={exporting}
-              style={{ backgroundColor: '#107c41', borderColor: '#107c41', color: '#fff' }}
-            >
-              <FileSpreadsheet size={16} />
-              <span>{exporting ? 'Mengekspor...' : 'Ekspor Excel (.xlsx)'}</span>
-            </button>
-            
-            {user.role !== 'VIEWER' && (
-              <Link 
-                href="/transaksi/import" 
-                className={`${styles.actionBtn} ${styles.importBtn}`}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-              >
-                <Upload size={16} />
-                <span>Unggah Excel / CSV</span>
-              </Link>
-            )}
-          </div>
-        )}
       </header>
 
-      {/* Tab Switcher - Only for SUPERADMIN */}
-      {user.role === 'SUPERADMIN' && (
-        <nav className={styles.tabsContainer}>
-          <button
-            type="button"
-            className={`${styles.tabBtn} ${activeTab === 'SUMMARY' ? styles.tabBtnActive : ''}`}
-            onClick={() => setActiveTab('SUMMARY')}
-          >
-            Ringkasan Laporan
-          </button>
-          <button
-            type="button"
-            className={`${styles.tabBtn} ${activeTab === 'COMPARISON' ? styles.tabBtnActive : ''}`}
-            onClick={() => setActiveTab('COMPARISON')}
-          >
-            Perbandingan Cabang
-          </button>
-        </nav>
+      <PDFExportModal 
+        isOpen={isPdfModalOpen} 
+        onClose={() => setIsPdfModalOpen(false)} 
+        onGenerate={handleGeneratePDF}
+        isGenerating={pdfGenerating}
+      />
+      
+      {report && (
+        <PDFPrintTemplate 
+          ref={pdfPrintRef}
+          user={user}
+          branchName={user.role !== 'SUPERADMIN' && user.branchId ? branches.find(b => b.id === user.branchId)?.name || 'Cabang Terdaftar' : (branchIds.length === 1 ? branches.find(b => b.id === branchIds[0])?.name || 'Semua Cabang' : 'Semua Cabang')}
+          periodText={period === 'YEARLY' ? `Tahunan (${year})` : `Bulan ${months.length === 12 ? 'Semua Bulan' : months.join(', ')} Tahun ${year}`}
+          report={report}
+          comparisonData={comparisonData}
+          comparisonBranches={comparisonBranches}
+          selectedBranchCodes={selectedBranchCodes}
+          transactions={pdfTransactions}
+        />
       )}
+
+      {/* Tab Switcher & Global Actions */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: user.role === 'SUPERADMIN' ? '2px solid var(--color-border)' : 'none', marginBottom: 'var(--space-1)', flexWrap: 'wrap', gap: '16px' }}>
+        {user.role === 'SUPERADMIN' ? (
+          <nav className={styles.tabsContainer} style={{ borderBottom: 'none', marginBottom: 0 }}>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${activeTab === 'SUMMARY' ? styles.tabBtnActive : ''}`}
+              onClick={() => setActiveTab('SUMMARY')}
+            >
+              Ringkasan Laporan
+            </button>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${activeTab === 'COMPARISON' ? styles.tabBtnActive : ''}`}
+              onClick={() => setActiveTab('COMPARISON')}
+            >
+              Perbandingan Cabang
+            </button>
+          </nav>
+        ) : (
+          <div /> /* Spacer */
+        )}
+
+        <div className={styles.actionsRow} style={{ marginBottom: user.role === 'SUPERADMIN' ? '8px' : '0' }}>
+          {activeTab === 'SUMMARY' && (
+            <>
+              <button 
+                type="button" 
+                onClick={handleExportExcel} 
+                className={`${styles.actionBtn} ${styles.exportBtn}`}
+                disabled={exporting}
+                style={{ backgroundColor: '#107c41', borderColor: '#107c41', color: '#fff' }}
+              >
+                <FileSpreadsheet size={16} />
+                <span>{exporting ? 'Mengekspor...' : 'Ekspor Excel (.xlsx)'}</span>
+              </button>
+              
+              <button 
+                type="button" 
+                onClick={() => setIsPdfModalOpen(true)} 
+                className={`${styles.actionBtn} ${styles.exportBtn}`}
+                disabled={pdfGenerating}
+                style={{ backgroundColor: '#DC2626', borderColor: '#DC2626', color: '#fff' }}
+              >
+                <FileText size={16} />
+                <span>Ekspor PDF (.pdf)</span>
+              </button>
+            </>
+          )}
+
+
+        </div>
+      </div>
 
       {/* ============================================================
          Tab Panel 1: Summary Dashboard
@@ -1028,36 +1172,61 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
                         <div className={styles.chartFrameEmpty}>
                           Tidak ada data komposisi tren untuk divisualisasikan.
                         </div>
-                      ) : mounted ? (
-                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                          <AreaChart data={report.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                            <XAxis dataKey="label" stroke="#94A3B8" fontSize={11} tickLine={false} />
-                            <YAxis 
-                              stroke="#94A3B8" 
-                              fontSize={11} 
-                              tickLine={false} 
-                              tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}Jt` : val}
-                            />
-                            <Tooltip 
-                              formatter={(value, name) => [formatRupiah(Number(value)), name]}
-                              contentStyle={{ background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '12px' }}
-                            />
-                            <Legend iconSize={10} iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                            {report.byCategory.map((cat, index) => (
-                              <Area
-                                key={cat.id}
-                                type="monotone"
-                                dataKey={cat.name}
-                                stackId="1"
-                                stroke={CHART_COLORS[index % CHART_COLORS.length]}
-                                fill={CHART_COLORS[index % CHART_COLORS.length]}
-                                fillOpacity={0.4}
+                      ) : mounted ? (() => {
+                        // Group categories: Top 5 + Lainnya
+                        const sortedCats = [...report.byCategory].sort((a, b) => b.total - a.total);
+                        const top5Cats = sortedCats.slice(0, 5);
+                        const hasLainnya = sortedCats.length > 5;
+                        
+                        const chartKeys = top5Cats.map(c => c.name);
+                        if (hasLainnya) chartKeys.push('Lainnya');
+
+                        const groupedTrendData = report.trendData.map((point: any) => {
+                          const newPoint: any = { label: point.label, total: point.total };
+                          let lainnyaTotal = 0;
+                          Object.keys(point).forEach(key => {
+                            if (key === 'label' || key === 'total') return;
+                            if (top5Cats.find(c => c.name === key)) {
+                              newPoint[key] = point[key];
+                            } else {
+                              lainnyaTotal += Number(point[key] || 0);
+                            }
+                          });
+                          if (hasLainnya) newPoint['Lainnya'] = lainnyaTotal;
+                          return newPoint;
+                        });
+
+                        return (
+                          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                            <AreaChart data={groupedTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                              <XAxis dataKey="label" stroke="#94A3B8" fontSize={11} tickLine={false} />
+                              <YAxis 
+                                stroke="#94A3B8" 
+                                fontSize={11} 
+                                tickLine={false} 
+                                tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(1)}Jt` : val}
                               />
-                            ))}
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      ) : null}
+                              <Tooltip 
+                                formatter={(value: any, name: any) => [formatRupiah(Number(value)), name]}
+                                contentStyle={{ background: '#FFF', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '12px' }}
+                              />
+                              <Legend iconSize={10} iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                              {chartKeys.map((key, index) => (
+                                <Area
+                                  key={key}
+                                  type="monotone"
+                                  dataKey={key}
+                                  stackId="1"
+                                  stroke={CHART_COLORS[index % CHART_COLORS.length]}
+                                  fill={CHART_COLORS[index % CHART_COLORS.length]}
+                                  fillOpacity={0.4}
+                                />
+                              ))}
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        );
+                      })() : null}
                     </div>
                   </div>
 

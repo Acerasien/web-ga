@@ -52,3 +52,5 @@ next-env.d.ts
 # deployment
 /DEPLOYMENT.md
 
+# graphify
+/graphify-out/
