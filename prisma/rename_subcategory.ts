@@ -19,41 +19,54 @@ async function main() {
   if (!dinasCat) {
     console.error('❌ Parent category with code "DINAS" not found.');
   } else {
-    const subCategory = await prisma.subCategory.findFirst({
-      where: {
-        categoryId: dinasCat.id,
-        name: 'Advan',
-      },
-    });
-
-    if (!subCategory) {
-      console.log('❓ Subcategory "Advan" not found under "Dinas". Already renamed or missing.');
+    const targetCat = dinasCat || await prisma.category.findFirst({ where: { name: 'Dinas' } });
+    if (!targetCat) {
+      console.error('❌ Category "Dinas" not found by code or name.');
     } else {
-      const updatedSub = await prisma.subCategory.update({
-        where: { id: subCategory.id },
-        data: { name: 'Advance' },
+      const subCategory = await prisma.subCategory.findFirst({
+        where: {
+          categoryId: targetCat.id,
+          name: 'Advan',
+        },
       });
-      console.log(`✅ Subcategory updated: "${subCategory.name}" -> "${updatedSub.name}"`);
+
+      if (!subCategory) {
+        console.log('❓ Subcategory "Advan" not found under "Dinas". Already renamed or missing.');
+      } else {
+        const updatedSub = await prisma.subCategory.update({
+          where: { id: subCategory.id },
+          data: { name: 'Advance' },
+        });
+        console.log(`✅ Subcategory updated: "${subCategory.name}" -> "${updatedSub.name}"`);
+      }
     }
   }
 
-  // 2. Correct Category "Seva" -> "Sewa" for category code "SEWA"
+  // 2. Correct Category "Seva" -> "Sewa" and code "SEVA" -> "SEWA"
   console.log('\nStep 2: Correcting Sewa Category...');
-  const sewaCat = await prisma.category.findUnique({
-    where: { code: 'SEWA' },
+  const sevaCat = await prisma.category.findFirst({
+    where: {
+      OR: [
+        { code: 'SEVA' },
+        { code: 'SEWA' }
+      ]
+    }
   });
 
-  if (!sewaCat) {
-    console.error('❌ Category with code "SEWA" not found.');
+  if (!sevaCat) {
+    console.error('❌ Category with code "SEVA" or "SEWA" not found.');
   } else {
-    if (sewaCat.name === 'Sewa') {
-      console.log('❓ Category name with code "SEWA" is already "Sewa". No change needed.');
+    if (sevaCat.name === 'Sewa' && sevaCat.code === 'SEWA') {
+      console.log('❓ Category is already named "Sewa" with code "SEWA". No change needed.');
     } else {
       const updatedCat = await prisma.category.update({
-        where: { id: sewaCat.id },
-        data: { name: 'Sewa' },
+        where: { id: sevaCat.id },
+        data: {
+          name: 'Sewa',
+          code: 'SEWA'
+        },
       });
-      console.log(`✅ Category updated: "${sewaCat.name}" -> "${updatedCat.name}"`);
+      console.log(`✅ Category updated: name "${sevaCat.name}" -> "${updatedCat.name}", code "${sevaCat.code}" -> "${updatedCat.code}"`);
     }
   }
 
