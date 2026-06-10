@@ -54,3 +54,6 @@ next-env.d.ts
 
 # graphify
 /graphify-out/
+
+# database wipe script
+/prisma/wipe.ts
