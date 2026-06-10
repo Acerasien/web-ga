@@ -327,6 +327,14 @@ export async function createRecurringBill(
       return { success: false, error: 'Mohon isi semua bidang wajib.' };
     }
 
+    // Input length validation (Finding #10)
+    if (data.description.length > 255) {
+      return { success: false, error: 'Deskripsi tagihan maksimal 255 karakter.' };
+    }
+    if (data.notes && data.notes.length > 5000) {
+      return { success: false, error: 'Catatan tambahan maksimal 5000 karakter.' };
+    }
+
     await prisma.recurringBill.create({
       data: {
         branchId: targetBranchId!,
@@ -378,6 +386,14 @@ export async function updateRecurringBill(
     // Branch lock for ADMIN
     if (user.role === 'ADMIN' && bill.branchId !== user.branchId) {
       return { success: false, error: 'Akses ditolak. Anda hanya dapat mengelola cabang Anda sendiri.' };
+    }
+
+    // Input length validation (Finding #10)
+    if (data.description && data.description.length > 255) {
+      return { success: false, error: 'Deskripsi tagihan maksimal 255 karakter.' };
+    }
+    if (data.notes && data.notes.length > 5000) {
+      return { success: false, error: 'Catatan tambahan maksimal 5000 karakter.' };
     }
 
     await prisma.recurringBill.update({

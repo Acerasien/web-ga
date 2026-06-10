@@ -68,6 +68,29 @@ export async function createTransaction(
       };
     }
 
+    // Input length validation (Finding #10)
+    if (description.length > 255) {
+      return { success: false, error: 'Keterangan transaksi maksimal 255 karakter.' };
+    }
+    if (unit.length > 20) {
+      return { success: false, error: 'Satuan unit maksimal 20 karakter.' };
+    }
+    if (taxNote && taxNote.length > 50) {
+      return { success: false, error: 'Catatan pajak maksimal 50 karakter.' };
+    }
+    if (vendor && vendor.length > 100) {
+      return { success: false, error: 'Vendor maksimal 100 karakter.' };
+    }
+    if (receiptPath && receiptPath.length > 500) {
+      return { success: false, error: 'Path berkas bukti transaksi terlalu panjang.' };
+    }
+    if (notes && notes.length > 5000) {
+      return { success: false, error: 'Catatan tambahan maksimal 5000 karakter.' };
+    }
+    if (beritaAcara && beritaAcara.length > 50) {
+      return { success: false, error: 'Nomor Berita Acara maksimal 50 karakter.' };
+    }
+
     // Determine target Branch ID based on role permissions
     let targetBranchId: number;
     if (user.role === 'SUPERADMIN') {

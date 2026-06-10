@@ -9,6 +9,23 @@ import { revalidatePath } from 'next/cache';
 import { createAuditLog } from '@/lib/actions/audit';
 import type { TransactionWithRelations } from './transactions';
 
+function validatePasswordStrength(password: string): { valid: boolean; error?: string } {
+  if (password.length < 8) {
+    return { valid: false, error: 'Password wajib diisi minimal 8 karakter.' };
+  }
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password);
+  const hasDigit = /[0-9]/.test(password);
+  
+  if (!hasUppercase || !hasLowercase || !hasDigit) {
+    return {
+      valid: false,
+      error: 'Password harus mengandung setidaknya satu huruf besar, satu huruf kecil, dan satu angka.'
+    };
+  }
+  return { valid: true };
+}
+
 export interface UserFilters {
   search?: string;
   branchId?: number;
@@ -139,8 +156,9 @@ export async function createUser(data: {
     if (!fullName || fullName.trim() === '') {
       return { success: false, error: 'Nama Lengkap wajib diisi.' };
     }
-    if (!passwordText || passwordText.length < 6) {
-      return { success: false, error: 'Password wajib diisi minimal 6 karakter.' };
+    const passwordValidation = validatePasswordStrength(passwordText);
+    if (!passwordValidation.valid) {
+      return { success: false, error: passwordValidation.error };
     }
 
     // Role-branch mapping constraint (Poka-Yoke)
@@ -161,7 +179,7 @@ export async function createUser(data: {
     }
 
     // 3. Cryptographically hash password using bcrypt
-    const passwordHash = await bcrypt.hash(passwordText, 10);
+    const passwordHash = await bcrypt.hash(passwordText, 12);
 
     const newUser = await prisma.user.create({
       data: {
@@ -362,15 +380,16 @@ export async function adminResetPassword(
       };
     }
 
-    if (!newPasswordText || newPasswordText.length < 6) {
+    const passwordValidation = validatePasswordStrength(newPasswordText);
+    if (!passwordValidation.valid) {
       return {
         success: false,
-        error: 'Password baru wajib diisi minimal 6 karakter.',
+        error: passwordValidation.error,
       };
     }
 
     // Cryptographically re-hash password
-    const passwordHash = await bcrypt.hash(newPasswordText, 10);
+    const passwordHash = await bcrypt.hash(newPasswordText, 12);
 
     const updated = await prisma.user.update({
       where: { id },

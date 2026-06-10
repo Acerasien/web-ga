@@ -3,6 +3,13 @@ import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
+if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL?.includes('web_ga_db')) {
+  if (!process.argv.includes('--force')) {
+    console.error('❌ ERROR: Running this script on the production database requires the "--force" flag!');
+    process.exit(1);
+  }
+}
+
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });

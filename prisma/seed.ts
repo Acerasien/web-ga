@@ -29,7 +29,14 @@ async function main() {
   // ============================================================
   // 2. Create Superadmin user
   // ============================================================
-  const passwordHash = await bcrypt.hash('admin123', 12);
+  const initialPassword = process.env.INITIAL_SUPERADMIN_PASSWORD;
+  if (!initialPassword) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('CRITICAL SECURITY ERROR: INITIAL_SUPERADMIN_PASSWORD environment variable is required in production!');
+    }
+    console.warn('⚠️ WARNING: INITIAL_SUPERADMIN_PASSWORD is not set. Seeding with default password "admin123". Please change this immediately!');
+  }
+  const passwordHash = await bcrypt.hash(initialPassword || 'admin123', 12);
   const superadmin = await prisma.user.upsert({
     where: { username: 'superadmin' },
     update: {},

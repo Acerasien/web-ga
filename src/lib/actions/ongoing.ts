@@ -196,6 +196,17 @@ export async function createOngoingPayment(data: {
       return { success: false, error: 'Mohon isi semua bidang wajib dengan benar.' };
     }
 
+    // Input length validation (Finding #10)
+    if (data.description.length > 255) {
+      return { success: false, error: 'Deskripsi request maksimal 255 karakter.' };
+    }
+    if (data.initialReceiptPath && data.initialReceiptPath.length > 500) {
+      return { success: false, error: 'Path berkas bukti awal terlalu panjang.' };
+    }
+    if (data.frequency && data.frequency.length > 20) {
+      return { success: false, error: 'Frekuensi maksimal 20 karakter.' };
+    }
+
     await prisma.ongoingPayment.create({
       data: {
         branchId: targetBranchId,
@@ -319,6 +330,20 @@ export async function realizeOngoingPayment(
 
     if (!data.notes || !data.notes.trim()) {
       return { success: false, error: 'Catatan tambahan wajib diisi.' };
+    }
+
+    // Input length validation (Finding #10)
+    if (data.finalReceiptPath.length > 500) {
+      return { success: false, error: 'Path berkas bukti realisasi terlalu panjang.' };
+    }
+    if (data.vendor && data.vendor.length > 100) {
+      return { success: false, error: 'Vendor maksimal 100 karakter.' };
+    }
+    if (data.notes.length > 5000) {
+      return { success: false, error: 'Catatan tambahan maksimal 5000 karakter.' };
+    }
+    if (data.beritaAcara && data.beritaAcara.length > 50) {
+      return { success: false, error: 'Nomor Berita Acara maksimal 50 karakter.' };
     }
 
     // Save transaction inside database with optional custom Berita Acara (BA)

@@ -14,6 +14,27 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 Megabytes in bytes
  */
 export async function POST(request: NextRequest) {
   try {
+    // CSRF Protection (Finding #6)
+    const host = request.headers.get('host');
+    const origin = request.headers.get('origin');
+    const referer = request.headers.get('referer');
+    let isValidOrigin = false;
+
+    if (origin) {
+      const originHost = new URL(origin).host;
+      isValidOrigin = originHost === host;
+    } else if (referer) {
+      const refererHost = new URL(referer).host;
+      isValidOrigin = refererHost === host;
+    }
+
+    if (!isValidOrigin) {
+      return NextResponse.json(
+        { success: false, error: 'Akses ditolak: Invalid request origin.' },
+        { status: 403 }
+      );
+    }
+
     // 1. Authenticate user session
     const user = await getCurrentUser();
     if (!user) {
@@ -57,13 +78,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Setup secure filesystem destination
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'receipts');
+    // 3. Setup secure filesystem destination (outside public/ folder for security)
+    const uploadDir = join(process.cwd(), 'uploads', 'receipts');
     // Ensure parent folders are initialized
     await mkdir(uploadDir, { recursive: true });
 
-    // 4. Generate highly randomized, safe filename to prevent path traversal
-    const fileExtension = extname(file.name) || (file.type === 'application/pdf' ? '.pdf' : '.jpg');
+    // 4. Generate highly randomized, safe filename derived from MIME type (Finding #5)
+    const MIME_TO_EXT: Record<string, string> = {
+      'image/png': '.png',
+      'image/jpeg': '.jpg',
+      'image/jpg': '.jpg',
+      'application/pdf': '.pdf',
+    };
+    const fileExtension = MIME_TO_EXT[file.type] || '.bin';
     const safeFilename = `${crypto.randomUUID()}${fileExtension}`;
     const filePath = join(uploadDir, safeFilename);
 

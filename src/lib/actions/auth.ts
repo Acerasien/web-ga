@@ -1,11 +1,29 @@
 'use server';
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import bcrypt from 'bcrypt';
 import { prisma } from '@/lib/prisma';
 import { signJWT, verifyJWT } from '@/lib/auth/jwt';
 import type { LoginRequest, ApiResponse, JWTPayload, AuthUser } from '@/types';
 import { createAuditLog } from '@/lib/actions/audit';
+
+interface RateLimitRecord {
+  attempts: number;
+  lockoutUntil: number;
+}
+
+const loginRateLimitMap = new Map<string, RateLimitRecord>();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
+
+function recordLoginFailure(ip: string) {
+  const record = loginRateLimitMap.get(ip) || { attempts: 0, lockoutUntil: 0 };
+  record.attempts += 1;
+  if (record.attempts >= MAX_LOGIN_ATTEMPTS) {
+    record.lockoutUntil = Date.now() + LOGIN_LOCKOUT_DURATION;
+  }
+  loginRateLimitMap.set(ip, record);
+}
 
 /**
  * Server Action to authenticate credentials, sign JWT, and set an HttpOnly cookie.
@@ -21,6 +39,21 @@ export async function login(data: LoginRequest): Promise<ApiResponse<void>> {
       };
     }
 
+    // IP-based Rate Limiting (Finding #4)
+    const headersList = await headers();
+    const ip = headersList.get('x-forwarded-for') || 'unknown-ip';
+    const rateLimitRecord = loginRateLimitMap.get(ip);
+    const now = Date.now();
+    
+    if (rateLimitRecord && rateLimitRecord.lockoutUntil > now) {
+      const remainingSeconds = Math.ceil((rateLimitRecord.lockoutUntil - now) / 1000);
+      const remainingMinutes = Math.ceil(remainingSeconds / 60);
+      return {
+        success: false,
+        error: `Terlalu banyak percobaan masuk salah. IP Anda diblokir sementara. Silakan coba lagi dalam ${remainingMinutes} menit.`,
+      };
+    }
+
     // Query user and their branch details
     const user = await prisma.user.findUnique({
       where: { username },
@@ -30,6 +63,7 @@ export async function login(data: LoginRequest): Promise<ApiResponse<void>> {
     });
 
     if (!user) {
+      recordLoginFailure(ip);
       return {
         success: false,
         error: 'Username atau password salah',
@@ -38,6 +72,7 @@ export async function login(data: LoginRequest): Promise<ApiResponse<void>> {
 
     // Poka-Yoke: Fail-fast if the user account is disabled
     if (!user.isActive) {
+      recordLoginFailure(ip);
       return {
         success: false,
         error: 'Akun Anda dinonaktifkan. Silakan hubungi superadmin.',
@@ -47,11 +82,15 @@ export async function login(data: LoginRequest): Promise<ApiResponse<void>> {
     // Enforce password hashing comparison
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
+      recordLoginFailure(ip);
       return {
         success: false,
         error: 'Username atau password salah',
       };
     }
+
+    // Clear rate limit record on success
+    loginRateLimitMap.delete(ip);
 
     // Compile Edge-friendly JWT payload
     const payload: JWTPayload = {
