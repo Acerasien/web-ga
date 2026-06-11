@@ -88,6 +88,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       const idxLocation = headers.findIndex(h => h === 'lokasi' || h.includes('location'));
       const idxBranch = headers.findIndex(h => h.includes('cabang') || h.includes('branch'));
       const idxVendor = headers.findIndex(h => h.includes('vendor') || h.includes('supplier'));
+      const idxBeritaAcara = headers.findIndex(h => h.includes('berita acara') || h.includes('berita_acara') || h === 'ba');
 
       // Validate mandatory columns exist in headers
       if (idxDate === -1 || idxCategory === -1 || idxDescription === -1 || idxQuantity === -1 || idxUnit === -1 || idxPrice === -1) {
@@ -100,6 +101,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
 
       let totalAmount = 0;
       let hasErrors = false;
+      const seenBAs = new Set<string>();
 
       const parsedRows = dataRows.map((row: any[], index: number) => {
         const rowNum = index + 2;
@@ -124,6 +126,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         const locationRaw = idxLocation !== -1 ? String(row[idxLocation] || '').trim().toUpperCase() : '';
         const branchRaw = idxBranch !== -1 ? String(row[idxBranch] || '').trim() : '';
         const vendorRaw = idxVendor !== -1 ? String(row[idxVendor] || '').trim() : '';
+        const beritaAcaraRaw = idxBeritaAcara !== -1 ? String(row[idxBeritaAcara] || '').trim() : '';
 
         // Validation rules
         const errors: string[] = [];
@@ -138,6 +141,14 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
             locationVal = locationRaw;
           } else {
             errors.push('Lokasi harus salah satu dari: Site, Mess, Office');
+          }
+        }
+
+        if (beritaAcaraRaw) {
+          if (seenBAs.has(beritaAcaraRaw)) {
+            errors.push(`Nomor Berita Acara '${beritaAcaraRaw}' duplikat dalam file`);
+          } else {
+            seenBAs.add(beritaAcaraRaw);
           }
         }
 
@@ -159,6 +170,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
           location: locationVal,
           branch: branchRaw,
           vendor: vendorRaw,
+          beritaAcara: beritaAcaraRaw,
           errors,
         };
       });
@@ -320,7 +332,8 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       "Pembayaran",
       "Lokasi",
       "Vendor",
-      "Catatan"
+      "Catatan",
+      "Berita Acara"
     ];
 
     const sampleRows = [
@@ -335,7 +348,8 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         "CASH",
         "Office",
         "RM Padang Sinar",
-        "Makan siang rapat bulanan GA"
+        "Makan siang rapat bulanan GA",
+        "0001/BA-GA/HO/V/2026"
       ],
       [
         "2026-05-19",
@@ -348,7 +362,8 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         "PETTY_CASH",
         "Site",
         "Toko Buku Jaya",
-        "Stok kertas printer kantor"
+        "Stok kertas printer kantor",
+        "0002/BA-GA/HO/V/2026"
       ]
     ];
 
@@ -369,7 +384,8 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       { wch: 12 }, // Pembayaran
       { wch: 12 }, // Lokasi
       { wch: 20 }, // Vendor
-      { wch: 30 }  // Catatan
+      { wch: 30 }, // Catatan
+      { wch: 25 }  // Berita Acara
     ];
     ws['!cols'] = wscols;
 

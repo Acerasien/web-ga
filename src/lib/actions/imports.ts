@@ -158,6 +158,7 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
     const idxVendor = headers.findIndex(h => h.includes('vendor') || h.includes('supplier'));
     const idxNotes = headers.findIndex(h => h.includes('catatan') || h.includes('notes'));
     const idxBranch = headers.findIndex(h => h.includes('cabang') || h.includes('branch'));
+    const idxBeritaAcara = headers.findIndex(h => h.includes('berita acara') || h.includes('berita_acara') || h === 'ba');
 
     // Check mandatory header columns
     if (idxDate === -1 || idxCategory === -1 || idxDescription === -1 || idxQuantity === -1 || idxUnit === -1 || idxPrice === -1) {
@@ -185,6 +186,33 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
     const dataRows = rawLines.slice(1).filter(r => r.length > 1 && r.some(val => val.trim() !== ''));
     const importErrors: string[] = [];
     const transactionsToInsert: Prisma.TransactionCreateManyInput[] = [];
+
+    // Pre-query unique non-empty BAs from the CSV file to avoid N+1 DB round-trips
+    const fileBAs = new Set<string>();
+    if (idxBeritaAcara !== -1) {
+      for (const row of dataRows) {
+        const baVal = row[idxBeritaAcara]?.trim();
+        if (baVal && baVal !== '') {
+          fileBAs.add(baVal);
+        }
+      }
+    }
+
+    // Query existing matching BAs in Postgres database
+    const dbBAs = new Set<string>();
+    if (fileBAs.size > 0) {
+      const existingTxs = await prisma.transaction.findMany({
+        where: {
+          beritaAcara: { in: Array.from(fileBAs) }
+        },
+        select: { beritaAcara: true }
+      });
+      existingTxs.forEach(tx => {
+        if (tx.beritaAcara) dbBAs.add(tx.beritaAcara);
+      });
+    }
+
+    const seenImportBAs = new Set<string>();
 
     // Process and validate rows sequentially
     for (let i = 0; i < dataRows.length; i++) {
@@ -290,6 +318,22 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
           }
         }
 
+        // 8. Berita Acara extraction & unique constraint validations
+        let beritaAcara: string | null = null;
+        if (idxBeritaAcara !== -1 && row[idxBeritaAcara]) {
+          const baVal = row[idxBeritaAcara].trim();
+          if (baVal !== '') {
+            if (dbBAs.has(baVal)) {
+              throw new Error(`Nomor Berita Acara '${baVal}' sudah terdaftar di database.`);
+            }
+            if (seenImportBAs.has(baVal)) {
+              throw new Error(`Nomor Berita Acara '${baVal}' duplikat dalam file.`);
+            }
+            seenImportBAs.add(baVal);
+            beritaAcara = baVal;
+          }
+        }
+
         // Populate object into temporary buffer
         transactionsToInsert.push({
           transactionDate,
@@ -307,7 +351,7 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
           vendor,
           notes,
           customFields: Prisma.DbNull, // CSV imports do not map complex custom categories forms natively
-          beritaAcara: null,
+          beritaAcara,
         });
 
       } catch (err: any) {
