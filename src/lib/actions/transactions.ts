@@ -409,6 +409,16 @@ export async function getTransactions(
         { vendor: { contains: queryStr, mode: 'insensitive' } },
         { notes: { contains: queryStr, mode: 'insensitive' } },
         { unit: { contains: queryStr, mode: 'insensitive' } },
+        {
+          category: {
+            name: { contains: queryStr, mode: 'insensitive' },
+          },
+        },
+        {
+          subCategory: {
+            name: { contains: queryStr, mode: 'insensitive' },
+          },
+        },
       ];
     }
 
