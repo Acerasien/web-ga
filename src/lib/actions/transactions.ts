@@ -298,6 +298,7 @@ export interface TransactionFilter {
   limit: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  missingReceipt?: boolean;
 }
 
 export interface TransactionWithRelations extends Omit<Transaction, 'quantity' | 'pricePerUnit' | 'totalAmount' | 'discountPerUnit' | 'discountTotal' | 'taxAmount'> {
@@ -351,6 +352,7 @@ export async function getTransactions(
       limit,
       sortBy = 'transactionDate',
       sortOrder = 'desc',
+      missingReceipt,
     } = filters;
 
     // Enforce role boundaries (Poka-Yoke)
@@ -393,6 +395,10 @@ export async function getTransactions(
       if (endDate) {
         where.transactionDate.lte = new Date(endDate);
       }
+    }
+
+    if (missingReceipt) {
+      where.receiptPath = null;
     }
 
     if (search && search.trim() !== '') {
@@ -619,6 +625,104 @@ export async function getTransactionById(
     return {
       success: false,
       error: 'Terjadi kesalahan sistem saat memuat detail transaksi.',
+    };
+  }
+}
+
+/**
+ * Server Action to securely update a transaction's receipt path (and linked ongoing payment final receipt).
+ * Enforces role boundaries (deny VIEWER) and revalidates Next.js pages.
+ */
+export async function updateTransactionReceipt(
+  id: number,
+  receiptPath: string
+): Promise<ApiResponse<void>> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: 'Sesi Anda telah berakhir. Silakan masuk kembali.',
+      };
+    }
+
+    if (user.role === 'VIEWER') {
+      return {
+        success: false,
+        error: 'Akses ditolak: Viewer tidak diizinkan mengubah berkas.',
+      };
+    }
+
+    // Input validation
+    if (!receiptPath || receiptPath.trim() === '') {
+      return {
+        success: false,
+        error: 'Path bukti kuitansi tidak boleh kosong.',
+      };
+    }
+    if (receiptPath.length > 500) {
+      return {
+        success: false,
+        error: 'Path bukti kuitansi terlalu panjang.',
+      };
+    }
+
+    // Fetch existing transaction to verify branch ownership/role boundary
+    const tx = await prisma.transaction.findUnique({
+      where: { id },
+      select: { branchId: true, description: true }
+    });
+
+    if (!tx) {
+      return {
+        success: false,
+        error: 'Transaksi tidak ditemukan.',
+      };
+    }
+
+    // Restrict DATA_ENTRY to their own branch
+    if (user.role !== 'SUPERADMIN' && tx.branchId !== user.branchId) {
+      return {
+        success: false,
+        error: 'Akses ditolak: Anda tidak memiliki izin untuk mengedit transaksi cabang lain.',
+      };
+    }
+
+    // Perform database writes in transaction to update receipt on Transaction and sync with OngoingPayment
+    await prisma.$transaction(async (db) => {
+      await db.transaction.update({
+        where: { id },
+        data: { receiptPath },
+      });
+
+      // Update final receipt path for the linked ongoing payment if it exists
+      await db.ongoingPayment.updateMany({
+        where: { transactionId: id },
+        data: { finalReceiptPath: receiptPath },
+      });
+
+      await createAuditLog({
+        userId: user.id,
+        actionType: 'UPDATE',
+        targetTable: 'Transaction',
+        targetId: String(id),
+        description: `Mengunggah bukti kuitansi untuk transaksi: "${tx.description}"`,
+      }, db);
+    });
+
+    revalidatePath('/dashboard');
+    revalidatePath('/transaksi/riwayat');
+    revalidatePath('/ongoing/list');
+
+    return {
+      success: true,
+      message: 'Bukti kuitansi berhasil diperbarui.',
+    };
+  } catch (error) {
+    console.error('Error inside updateTransactionReceipt Server Action:', error);
+    return {
+      success: false,
+      error: 'Terjadi kesalahan sistem saat menyimpan bukti kuitansi.',
     };
   }
 }

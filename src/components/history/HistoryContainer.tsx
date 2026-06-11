@@ -543,6 +543,9 @@ export default function HistoryContainer({ user, categories, branches }: History
         onDeleteSuccess={() => {
           setRefreshTrigger(prev => prev + 1);
         }}
+        onUploadSuccess={() => {
+          setRefreshTrigger(prev => prev + 1);
+        }}
         onClose={() => {
           setModalOpen(false);
           setSelectedTransaction(null);

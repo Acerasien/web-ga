@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { X, FileText, AlertCircle, Calendar, User, MapPin, CreditCard, ExternalLink, Trash2, Loader2 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { X, FileText, AlertCircle, Calendar, User, MapPin, CreditCard, ExternalLink, Trash2, Loader2, UploadCloud } from 'lucide-react';
 import { formatRupiah } from '@/lib/formatters';
 import type { TransactionWithRelations } from '@/lib/actions/transactions';
-import { deleteTransaction } from '@/lib/actions/transactions';
+import { deleteTransaction, updateTransactionReceipt } from '@/lib/actions/transactions';
 import type { FieldsConfig, CategoryField } from '@/types';
 import styles from './modal.module.css';
 
@@ -14,6 +14,7 @@ interface TransactionDetailModalProps {
   onClose: () => void;
   currentUserRole?: string;
   onDeleteSuccess?: () => void;
+  onUploadSuccess?: () => void;
 }
 
 export default function TransactionDetailModal({ 
@@ -21,12 +22,85 @@ export default function TransactionDetailModal({
   isOpen, 
   onClose,
   currentUserRole,
-  onDeleteSuccess
+  onDeleteSuccess,
+  onUploadSuccess
 }: TransactionDetailModalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // File upload state management
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [localReceiptPath, setLocalReceiptPath] = useState<string | null>(null);
+  const [currentTxId, setCurrentTxId] = useState<number | null>(null);
+
   if (!isOpen || !transaction) return null;
+
+  // Sync prop changes to local uploader states without triggering unnecessary infinite renders
+  if (transaction.id !== currentTxId) {
+    setCurrentTxId(transaction.id);
+    setLocalReceiptPath(transaction.receiptPath);
+    setUploadError(null);
+    setUploading(false);
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (uploading) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleUpload(file);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleUpload(file);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleUpload = async (file: File) => {
+    setUploading(true);
+    setUploadError(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/transactions/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        const linkResult = await updateTransactionReceipt(transaction.id, result.receiptPath);
+        if (linkResult.success) {
+          setLocalReceiptPath(result.receiptPath);
+          if (onUploadSuccess) {
+            onUploadSuccess();
+          }
+        } else {
+          setUploadError(linkResult.error || 'Gagal menyimpan bukti kuitansi.');
+        }
+      } else {
+        setUploadError(result.error || 'Gagal mengunggah kuitansi.');
+      }
+    } catch (error) {
+      console.error('File upload error:', error);
+      setUploadError('Koneksi gagal. Periksa jaringan Anda.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
 
   // Format payment method badge styling
@@ -271,41 +345,88 @@ export default function TransactionDetailModal({
           {/* Section 5: Bukti Kuitansi (Nota) */}
           <div className={styles.receiptContainer}>
             <h4 className={styles.sectionTitle}>Bukti Kuitansi (Nota Fisik)</h4>
-            {transaction.receiptPath ? (
+            {localReceiptPath ? (
               <div className={styles.receiptFrame}>
-                {transaction.receiptPath.toLowerCase().endsWith('.pdf') ? (
+                {localReceiptPath.toLowerCase().endsWith('.pdf') ? (
                   // PDF Preview (Fallback Action to satisfy Android/iOS volatility constraints)
                   <div className={styles.pdfBox}>
                     <FileText size={48} className={styles.pdfIcon} />
                     <span className={styles.pdfName}>
-                      {transaction.receiptPath.split('/').pop() || 'kuitansi.pdf'}
+                      {localReceiptPath.split('/').pop() || 'kuitansi.pdf'}
                     </span>
                     <a
-                      href={transaction.receiptPath || undefined}
+                      href={localReceiptPath || undefined}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={styles.pdfDownloadBtn}
                     >
-                      <span>Buka & Unduh PDF</span>
+                      <span>Buka &amp; Unduh PDF</span>
                       <ExternalLink size={16} />
                     </a>
                   </div>
                 ) : (
                   // Image Preview slot with browser Zoom support
                   <img
-                    src={transaction.receiptPath || undefined}
+                    src={localReceiptPath || undefined}
                     alt="Bukti pembayaran kuitansi"
                     className={styles.receiptImg}
-                    onClick={() => window.open(transaction.receiptPath || undefined, '_blank')}
+                    onClick={() => window.open(localReceiptPath || undefined, '_blank')}
                     title="Klik untuk memperbesar gambar bukti pembayaran"
                   />
                 )}
               </div>
-            ) : (
-              // Soft warn alert banner
+            ) : currentUserRole === 'VIEWER' ? (
+              // Soft warn alert banner for Viewers
               <div className={styles.noReceiptAlert}>
                 <AlertCircle size={18} />
                 <span>Tidak ada foto bukti kuitansi yang diunggah untuk transaksi ini.</span>
+              </div>
+            ) : (
+              // Drag & Drop Box for Editors
+              <div
+                className={`${styles.uploaderContainer} ${uploading ? styles.uploadDisabled : ''}`}
+                onDragOver={handleDragOver}
+                onDrop={handleFileDrop}
+                onClick={() => !uploading && fileInputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    if (!uploading) fileInputRef.current?.click();
+                  }
+                }}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  accept=".png, .jpg, .jpeg, .pdf"
+                  onChange={handleFileSelect}
+                  disabled={uploading}
+                />
+
+                {uploading ? (
+                  <>
+                    <div className={styles.spinner} />
+                    <span className={styles.uploaderText}>Mengunggah kuitansi...</span>
+                  </>
+                ) : (
+                  <>
+                    <UploadCloud size={36} className={styles.uploaderIcon} />
+                    <span className={styles.uploaderText}>
+                      Tarik &amp; lepas kuitansi di sini, atau <span className={styles.uploaderLink}>Pilih Berkas</span>
+                    </span>
+                    <span className={styles.uploaderText} style={{ fontSize: 'var(--text-xs)', opacity: 0.7 }}>
+                      Mendukung PNG, JPG, JPEG, atau PDF (Maks. 5MB)
+                    </span>
+                  </>
+                )}
+
+                {uploadError && (
+                  <div style={{ marginTop: 'var(--space-2)', color: 'var(--color-danger)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
+                    {uploadError}
+                  </div>
+                )}
               </div>
             )}
           </div>

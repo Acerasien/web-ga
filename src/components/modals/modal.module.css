@@ -296,3 +296,68 @@
   gap: 4px;
 }
 
+/* ============================================================
+   Inline Receipt Uploader Classes
+   ============================================================ */
+.uploaderContainer {
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background-color: var(--color-bg);
+  min-height: 180px;
+}
+
+.uploaderContainer:hover:not(.uploadDisabled) {
+  border-color: var(--color-primary);
+  background-color: rgba(59, 130, 246, 0.02);
+}
+
+.uploadDisabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.uploaderIcon {
+  color: var(--color-text-muted);
+  opacity: 0.8;
+  transition: color var(--transition-fast);
+}
+
+.uploaderContainer:hover:not(.uploadDisabled) .uploaderIcon {
+  color: var(--color-primary);
+}
+
+.uploaderText {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.uploaderLink {
+  color: var(--color-primary);
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border);
+  border-radius: 50%;
+  border-top-color: var(--color-primary);
+  animation: spin 0.8s linear infinite;
+  margin-bottom: var(--space-2);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
