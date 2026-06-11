@@ -727,3 +727,212 @@ export async function updateTransactionReceipt(
   }
 }
 
+/**
+ * Server Action to securely update a transaction's details.
+ * Performs strict input validation, re-calculates totalAmount, and checks role boundaries.
+ */
+export async function updateTransaction(
+  id: number,
+  data: TransactionFormData & { branchId?: number }
+): Promise<ApiResponse<void>> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: 'Sesi Anda telah berakhir. Silakan masuk kembali.',
+      };
+    }
+
+    if (user.role === 'VIEWER') {
+      return {
+        success: false,
+        error: 'Akses ditolak. Peran Viewer tidak diizinkan untuk mengubah data.',
+      };
+    }
+
+    const {
+      categoryId,
+      subCategoryId,
+      transactionDate,
+      description,
+      quantity,
+      unit,
+      pricePerUnit,
+      discountPerUnit,
+      discountTotal,
+      taxAmount,
+      taxNote,
+      paymentMethod,
+      location,
+      vendor,
+      receiptPath,
+      notes,
+      customFields,
+      beritaAcara,
+    } = data;
+
+    // Fetch existing transaction first
+    const existingTx = await prisma.transaction.findUnique({
+      where: { id },
+    });
+
+    if (!existingTx) {
+      return {
+        success: false,
+        error: 'Transaksi tidak ditemukan.',
+      };
+    }
+
+    // Role boundary check: ADMIN/DATA_ENTRY are locked to their home branch
+    if (user.role !== 'SUPERADMIN' && existingTx.branchId !== user.branchId) {
+      return {
+        success: false,
+        error: 'Akses ditolak. Anda tidak memiliki izin untuk mengubah transaksi cabang lain.',
+      };
+    }
+
+    // Fail-fast on required primary field parameters
+    if (!categoryId || !transactionDate || !description.trim() || quantity <= 0 || !unit.trim() || pricePerUnit < 0 || !paymentMethod) {
+      return {
+        success: false,
+        error: 'Mohon lengkapi semua bidang wajib dengan benar.',
+      };
+    }
+
+    // Input length validation
+    if (description.length > 255) {
+      return { success: false, error: 'Keterangan transaksi maksimal 255 karakter.' };
+    }
+    if (unit.length > 20) {
+      return { success: false, error: 'Satuan unit maksimal 20 karakter.' };
+    }
+    if (taxNote && taxNote.length > 50) {
+      return { success: false, error: 'Catatan pajak maksimal 50 karakter.' };
+    }
+    if (vendor && vendor.length > 100) {
+      return { success: false, error: 'Vendor maksimal 100 karakter.' };
+    }
+    if (notes && notes.length > 5000) {
+      return { success: false, error: 'Catatan tambahan maksimal 5000 karakter.' };
+    }
+    if (beritaAcara && beritaAcara.length > 50) {
+      return { success: false, error: 'Nomor Berita Acara maksimal 50 karakter.' };
+    }
+
+    // Determine target Branch ID based on role permissions
+    let targetBranchId: number;
+    if (user.role === 'SUPERADMIN') {
+      if (!data.branchId) {
+        return {
+          success: false,
+          error: 'Administrator wajib menentukan cabang penanggung jawab.',
+        };
+      }
+      targetBranchId = data.branchId;
+    } else {
+      // ADMIN/DATA_ENTRY: cannot change branch, must keep transaction's branch
+      targetBranchId = existingTx.branchId;
+    }
+
+    // Compute total using full breakdown formula
+    const qty = new Prisma.Decimal(quantity);
+    const price = new Prisma.Decimal(pricePerUnit);
+    let totalAmount = qty.mul(price);
+    const discountPerUnitDecimal = discountPerUnit ? new Prisma.Decimal(discountPerUnit) : null;
+    const discountTotalDecimal = discountTotal ? new Prisma.Decimal(discountTotal) : null;
+    const taxAmountDecimal = taxAmount ? new Prisma.Decimal(taxAmount) : null;
+    if (discountPerUnitDecimal) totalAmount = totalAmount.sub(discountPerUnitDecimal.mul(qty));
+    if (discountTotalDecimal) totalAmount = totalAmount.sub(discountTotalDecimal);
+    if (taxAmountDecimal) totalAmount = totalAmount.add(taxAmountDecimal);
+    
+    // Guard: total cannot be negative
+    if (totalAmount.lessThan(0)) totalAmount = new Prisma.Decimal(0);
+
+    const txDate = new Date(transactionDate);
+
+    // If Berita Acara is modified, check uniqueness
+    let finalBeritaAcara: string | null = null;
+    if (beritaAcara && beritaAcara.trim() !== '') {
+      const trimmedBA = beritaAcara.trim();
+      if (trimmedBA !== existingTx.beritaAcara) {
+        // Unique check
+        const existing = await prisma.transaction.findFirst({
+          where: { beritaAcara: trimmedBA },
+          select: { id: true },
+        });
+        
+        if (existing) {
+          return {
+            success: false,
+            error: 'Nomor Berita Acara tersebut sudah digunakan oleh transaksi lain.',
+          };
+        }
+      }
+      finalBeritaAcara = trimmedBA;
+    }
+
+    // Update inside a database transaction to keep OngoingPayment amount in sync if linked
+    await prisma.$transaction(async (tx) => {
+      const updatedTx = await tx.transaction.update({
+        where: { id },
+        data: {
+          branchId: targetBranchId,
+          categoryId: Number(categoryId),
+          subCategoryId: subCategoryId ? Number(subCategoryId) : null,
+          transactionDate: txDate,
+          description: description.trim(),
+          quantity: qty,
+          unit: unit.trim(),
+          pricePerUnit: price,
+          discountPerUnit: discountPerUnitDecimal,
+          discountTotal: discountTotalDecimal,
+          taxAmount: taxAmountDecimal,
+          taxNote: taxNote?.trim() || null,
+          totalAmount,
+          paymentMethod,
+          location: location || null,
+          vendor: vendor?.trim() || null,
+          receiptPath: receiptPath || null,
+          notes: notes?.trim() || null,
+          customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,
+          beritaAcara: finalBeritaAcara,
+        },
+      });
+
+      // Update linked ongoing payment if it exists
+      await tx.ongoingPayment.updateMany({
+        where: { transactionId: id },
+        data: {
+          actualAmount: updatedTx.totalAmount,
+          finalReceiptPath: receiptPath || null,
+        },
+      });
+
+      await createAuditLog({
+        userId: user.id,
+        actionType: 'UPDATE',
+        targetTable: 'Transaction',
+        targetId: String(id),
+        description: `Mengubah transaksi: "${updatedTx.description}" senilai Rp ${Number(updatedTx.totalAmount).toLocaleString('id-ID')}`,
+      }, tx);
+    });
+
+    // Clear router cache tags to trigger live layout refreshes
+    revalidatePath('/dashboard');
+    revalidatePath('/transaksi/riwayat');
+    revalidatePath('/ongoing/list');
+
+    return {
+      success: true,
+      message: 'Transaksi berhasil diperbarui.',
+    };
+  } catch (error) {
+    console.error('Error during updateTransaction Server Action:', error);
+    return {
+      success: false,
+      error: 'Terjadi kesalahan sistem saat memperbarui transaksi.',
+    };
+  }
+}
+
