@@ -21,6 +21,7 @@ export interface AssetWithRelations {
   status: AssetStatus;
   imagePath: string | null;
   notes: string | null;
+  purchaseYear: number | null;
   archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -179,6 +180,15 @@ export async function createAsset(data: AssetFormData): Promise<ApiResponse<Asse
       return { success: false, error: 'Kategori aset tidak valid.' };
     }
 
+    // Validate purchaseYear
+    if (data.purchaseYear === undefined || data.purchaseYear === null) {
+      return { success: false, error: 'Tahun pembelian wajib diisi.' };
+    }
+    const currentYear = new Date().getFullYear();
+    if (isNaN(data.purchaseYear) || data.purchaseYear < 1900 || data.purchaseYear > currentYear + 5) {
+      return { success: false, error: `Tahun pembelian tidak valid (harus antara 1900 dan ${currentYear + 5}).` };
+    }
+
     // Check assetTag uniqueness in active assets
     if (data.assetTag && data.assetTag.trim() !== '') {
       const existing = await prisma.asset.findFirst({
@@ -205,6 +215,7 @@ export async function createAsset(data: AssetFormData): Promise<ApiResponse<Asse
         status: data.status,
         imagePath: data.imagePath || null,
         notes: data.notes?.trim() || null,
+        purchaseYear: data.purchaseYear,
       },
       include: {
         branch: { select: { name: true, code: true } },
@@ -273,6 +284,15 @@ export async function updateAsset(
       return { success: false, error: 'Kategori aset tidak valid.' };
     }
 
+    // Validate purchaseYear
+    if (data.purchaseYear === undefined || data.purchaseYear === null) {
+      return { success: false, error: 'Tahun pembelian wajib diisi.' };
+    }
+    const currentYear = new Date().getFullYear();
+    if (isNaN(data.purchaseYear) || data.purchaseYear < 1900 || data.purchaseYear > currentYear + 5) {
+      return { success: false, error: `Tahun pembelian tidak valid (harus antara 1900 dan ${currentYear + 5}).` };
+    }
+
     // Check assetTag uniqueness if changed
     const newTag = data.assetTag?.trim();
     if (newTag && newTag !== (existingAsset.assetTag || '')) {
@@ -307,6 +327,7 @@ export async function updateAsset(
         status: data.status,
         imagePath: data.imagePath || existingAsset.imagePath,
         notes: data.notes?.trim() || null,
+        purchaseYear: data.purchaseYear,
       },
       include: {
         branch: { select: { name: true, code: true } },
@@ -462,12 +483,13 @@ export async function importAssets(csvString: string): Promise<ApiResponse<CSVIm
     const idxStatus = headers.findIndex(h => h.includes('status') || h.includes('kondisi'));
     const idxNotes = headers.findIndex(h => h.includes('catatan') || h.includes('notes') || h.includes('keterangan'));
     const idxBranch = headers.findIndex(h => h.includes('cabang') || h.includes('branch'));
+    const idxYear = headers.findIndex(h => h.includes('tahun') || h.includes('year') || h === 'thn' || h.includes('pembelian'));
 
     // Validate mandatory headers
-    if (idxName === -1 || idxCategory === -1) {
+    if (idxName === -1 || idxCategory === -1 || idxYear === -1) {
       return {
         success: false,
-        error: 'Struktur kolom tidak lengkap. Pastikan memiliki kolom dengan tajuk: Nama (Name) dan Kategori (Category).',
+        error: 'Struktur kolom tidak lengkap. Pastikan memiliki kolom dengan tajuk: Nama (Name), Kategori (Category), dan Tahun (Year).',
       };
     }
 
@@ -590,6 +612,19 @@ export async function importAssets(csvString: string): Promise<ApiResponse<CSVIm
           branchIdVal = user.branchId;
         }
 
+        // 10. Purchase Year Check
+        let purchaseYear: number;
+        if (idxYear !== -1 && row[idxYear]?.trim()) {
+          const parsedYear = parseInt(row[idxYear].trim(), 10);
+          const currentYear = new Date().getFullYear();
+          if (isNaN(parsedYear) || parsedYear < 1900 || parsedYear > currentYear + 5) {
+            throw new Error('Tahun pembelian harus berupa angka tahun yang valid (misal: 2024).');
+          }
+          purchaseYear = parsedYear;
+        } else {
+          throw new Error('Tahun pembelian wajib diisi.');
+        }
+
         assetsToInsert.push({
           branchId: branchIdVal,
           userId: user.id,
@@ -601,6 +636,7 @@ export async function importAssets(csvString: string): Promise<ApiResponse<CSVIm
           pic,
           status,
           notes,
+          purchaseYear,
           imagePath: null, // Initial import does not carry photo files
         });
       } catch (err) {

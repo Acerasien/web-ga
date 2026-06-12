@@ -160,6 +160,7 @@ export interface AssetFormData {
   status: 'AKTIF' | 'RUSAK' | 'DIPERBAIKI' | 'HILANG';
   imagePath?: string | null;
   notes?: string | null;
+  purchaseYear: number;
   branchId?: number;
 }
 

@@ -59,6 +59,7 @@ export default function AssetDetailModal({
   const [notes, setNotes] = useState<string>('');
   const [branchId, setBranchId] = useState<string>('');
   const [imagePath, setImagePath] = useState<string>('');
+  const [purchaseYear, setPurchaseYear] = useState<string>('');
 
   // Image upload states
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
@@ -78,6 +79,7 @@ export default function AssetDetailModal({
       setNotes(asset.notes || '');
       setBranchId(String(asset.branchId));
       setImagePath(asset.imagePath || '');
+      setPurchaseYear(asset.purchaseYear ? String(asset.purchaseYear) : '');
       setIsEditing(false);
     } else {
       setName('');
@@ -90,6 +92,7 @@ export default function AssetDetailModal({
       setNotes('');
       setBranchId(user.branchId ? String(user.branchId) : '');
       setImagePath('');
+      setPurchaseYear('');
       setIsEditing(true);
     }
     setError(null);
@@ -150,6 +153,16 @@ export default function AssetDetailModal({
       setError('Pilih cabang penanggung jawab.');
       return;
     }
+    if (!purchaseYear.trim()) {
+      setError('Tahun pembelian wajib diisi.');
+      return;
+    }
+    const yearNum = Number(purchaseYear);
+    const currentYear = new Date().getFullYear();
+    if (isNaN(yearNum) || yearNum < 1900 || yearNum > currentYear + 5) {
+      setError(`Tahun pembelian tidak valid (harus antara 1900 dan ${currentYear + 5}).`);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -165,6 +178,7 @@ export default function AssetDetailModal({
       notes: notes.trim() || null,
       branchId: branchId ? Number(branchId) : undefined,
       imagePath: imagePath || null,
+      purchaseYear: yearNum,
     };
 
     try {
@@ -320,6 +334,22 @@ export default function AssetDetailModal({
                     placeholder="Contoh: Lenovo L14 Gen 2"
                     value={brandModel}
                     onChange={(e) => setBrandModel(e.target.value)}
+                  />
+                </div>
+
+                {/* Tahun Pembelian */}
+                <div className={inputStyles.formGroup}>
+                  <label htmlFor="purchaseYear" className={`${inputStyles.label} ${inputStyles.labelRequired}`}>Tahun Pembelian</label>
+                  <input
+                    id="purchaseYear"
+                    type="number"
+                    min="1900"
+                    max={new Date().getFullYear() + 5}
+                    required
+                    className={inputStyles.input}
+                    placeholder="Contoh: 2024"
+                    value={purchaseYear}
+                    onChange={(e) => setPurchaseYear(e.target.value)}
                   />
                 </div>
 
@@ -521,6 +551,11 @@ export default function AssetDetailModal({
                   <div className={styles.item}>
                     <span className={styles.label}>Brand / Model</span>
                     <span className={styles.value}>{brandModel || '-'}</span>
+                  </div>
+
+                  <div className={styles.item}>
+                    <span className={styles.label}>Tahun Pembelian</span>
+                    <span className={styles.value}>{asset?.purchaseYear || '-'}</span>
                   </div>
                 </div>
               </div>

@@ -87,10 +87,11 @@ export default function AssetImportModal({
       const idxStatus = headers.findIndex(h => h.includes('status') || h.includes('kondisi'));
       const idxNotes = headers.findIndex(h => h.includes('catatan') || h.includes('notes') || h.includes('keterangan'));
       const idxBranch = headers.findIndex(h => h.includes('cabang') || h.includes('branch'));
+      const idxYear = headers.findIndex(h => h.includes('tahun') || h.includes('year') || h === 'thn' || h.includes('pembelian'));
 
       // Validate required columns
-      if (idxName === -1 || idxCategory === -1) {
-        setGeneralError('Tajuk kolom tidak valid. File harus memiliki kolom "Nama" (Name) dan "Kategori" (Category).');
+      if (idxName === -1 || idxCategory === -1 || idxYear === -1) {
+        setGeneralError('Tajuk kolom tidak valid. File harus memiliki kolom "Nama" (Name), "Kategori" (Category), dan "Tahun" (Year).');
         setPreviewRows([]);
         setPreviewSummary({ totalRows: 0, hasErrors: true, errorCount: 1 });
         return;
@@ -112,6 +113,7 @@ export default function AssetImportModal({
         const statusRaw = idxStatus !== -1 ? String(row[idxStatus] || '').trim() : 'AKTIF';
         const notesRaw = idxNotes !== -1 ? String(row[idxNotes] || '').trim() : '';
         const branchRaw = idxBranch !== -1 ? String(row[idxBranch] || '').trim() : '';
+        const yearRaw = idxYear !== -1 ? String(row[idxYear] || '').trim() : '';
 
         // Validation checks
         const errors: string[] = [];
@@ -128,6 +130,18 @@ export default function AssetImportModal({
             errors.push(`Kategori '${categoryRaw}' tidak valid (Gunakan salah satu dari: Elektronik, Peralatan Kantor, Mebel & Furniture, Kendaraan, Peralatan Dapur & Mess, Perkakas & Alat Berat, Lain-lain)`);
             categoryDisplay = categoryRaw;
           }
+        }
+
+        let yearDisplay = '';
+        if (!yearRaw) {
+          errors.push('Tahun pembelian wajib diisi');
+        } else {
+          const parsedYear = parseInt(yearRaw, 10);
+          const currentYear = new Date().getFullYear();
+          if (isNaN(parsedYear) || parsedYear < 1900 || parsedYear > currentYear + 5) {
+            errors.push('Tahun pembelian harus berupa 4 digit angka tahun yang valid (misal: 2024)');
+          }
+          yearDisplay = yearRaw;
         }
 
         if (tagRaw) {
@@ -188,6 +202,7 @@ export default function AssetImportModal({
           status: statusDisplay,
           branch: branchDisplay,
           notes: notesRaw,
+          purchaseYear: yearDisplay,
           errors,
         };
       });
@@ -404,6 +419,7 @@ export default function AssetImportModal({
                   <div style={{ fontSize: '12px', lineHeight: 1.6 }}>
                     • <b>Nama / Name <span style={{ color: 'var(--color-danger)' }}>*</span></b>: Nama barang/aset.<br/>
                     • <b>Kategori / Category <span style={{ color: 'var(--color-danger)' }}>*</span></b>: Kategori aset (Gunakan: <i>Elektronik, Peralatan Kantor, Mebel & Furniture, Kendaraan, Peralatan Dapur & Mess, Perkakas & Alat Berat, Lain-lain</i>).<br/>
+                    • <b>Tahun / Year <span style={{ color: 'var(--color-danger)' }}>*</span></b>: Tahun pembelian aset (misal: 2024).<br/>
                     • <b>Kode / Tag Aset</b>: Kode identifikasi unik aset.<br/>
                     • <b>Brand / Model</b>: Merek atau tipe spesifik barang.<br/>
                     • <b>PIC / Penanggung Jawab</b>: Pemegang/penanggung jawab barang saat ini.<br/>
@@ -456,6 +472,7 @@ export default function AssetImportModal({
                       <th className={styles.th}>Nama Aset</th>
                       <th className={styles.th}>Kategori</th>
                       <th className={styles.th}>Brand</th>
+                      <th className={styles.th}>Tahun</th>
                       <th className={styles.th}>PIC</th>
                       <th className={styles.th}>Lokasi</th>
                       <th className={styles.th}>Status</th>
@@ -477,6 +494,7 @@ export default function AssetImportModal({
                           <td className={styles.td} style={{ fontWeight: 600, color: hasErr && !row.name ? 'var(--color-danger)' : 'inherit' }}>{row.name || '(Kosong)'}</td>
                           <td className={styles.td} style={{ color: hasErr && !row.category ? 'var(--color-danger)' : 'inherit' }}>{row.category || '(Kosong)'}</td>
                           <td className={styles.td}>{row.brandModel || '-'}</td>
+                          <td className={styles.td} style={{ color: hasErr && !row.purchaseYear ? 'var(--color-danger)' : 'inherit' }}>{row.purchaseYear || '(Kosong)'}</td>
                           <td className={styles.td}>{row.pic || '-'}</td>
                           <td className={styles.td}>{row.locationDetail || '-'}</td>
                           <td className={styles.td}>{row.status}</td>
