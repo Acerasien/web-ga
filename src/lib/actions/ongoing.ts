@@ -168,6 +168,7 @@ export async function createOngoingPayment(data: {
   requestDate?: string;
   frequency?: string;
   location?: Location;
+  notes?: string;
 }): Promise<ApiResponse<void>> {
   try {
     const user = await getCurrentUser();
@@ -206,6 +207,9 @@ export async function createOngoingPayment(data: {
     if (data.frequency && data.frequency.length > 20) {
       return { success: false, error: 'Frekuensi maksimal 20 karakter.' };
     }
+    if (data.notes && data.notes.length > 2000) {
+      return { success: false, error: 'Catatan tambahan maksimal 2000 karakter.' };
+    }
 
     await prisma.ongoingPayment.create({
       data: {
@@ -220,6 +224,7 @@ export async function createOngoingPayment(data: {
         status: 'BELUM_DIBAYAR',
         frequency: data.frequency || null,
         location: data.location || null,
+        notes: data.notes?.trim() || null,
       },
     });
 

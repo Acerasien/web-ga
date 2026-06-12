@@ -51,6 +51,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
   };
   const [description, setDescription] = useState<string>('');
   const [amountNeeded, setAmountNeeded] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
   const [receiptPath, setReceiptPath] = useState<string>('');
   const [requestDate, setRequestDate] = useState<string>(() => {
     const d = new Date();
@@ -179,6 +180,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
           requestDate,
           frequency: frequency || undefined,
           location: location ? (location as Location) : undefined,
+          notes: notes.trim() || undefined,
         });
 
         if (res.success) {
@@ -204,6 +206,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
     setAmountNeeded('');
     setFrequency('');
     setLocation('');
+    setNotes('');
     handleRemoveReceipt();
   };
 
@@ -380,6 +383,19 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
                   required
                 />
               </div>
+            </div>
+
+            <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+              <label htmlFor="notes" className={styles.label}>Catatan Tambahan (Opsional)</label>
+              <textarea
+                id="notes"
+                className={`${styles.input} ${styles.textarea}`}
+                placeholder="Contoh: Keterangan tambahan mengenai keperluan dana panjar"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                disabled={isPending}
+                rows={3}
+              />
             </div>
           </div>
 
