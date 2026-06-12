@@ -18,6 +18,7 @@ import {
   Clock,
   CalendarClock,
   ShieldAlert,
+  Package,
 } from 'lucide-react';
 import type { AuthUser, NavItem } from '@/types';
 import styles from './Sidebar.module.css';
@@ -26,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY', 'VIEWER'] },
   { label: 'Input Transaksi', href: '/transaksi/input', icon: 'PlusCircle', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY'] },
   { label: 'Riwayat', href: '/transaksi/riwayat', icon: 'ClipboardList', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY'] },
+  { label: 'Inventaris', href: '/inventaris', icon: 'Package', roles: ['SUPERADMIN', 'ADMIN', 'DATA_ENTRY', 'VIEWER'] },
   { label: 'Daftar Pembayaran', href: '/ongoing/list', icon: 'Clock', roles: ['SUPERADMIN', 'ADMIN'] },
   { label: 'Input Pembayaran', href: '/ongoing/input', icon: 'PlusCircle', roles: ['SUPERADMIN', 'ADMIN'] },
   { label: 'Riwayat Pembayaran', href: '/ongoing/riwayat', icon: 'ClipboardList', roles: ['SUPERADMIN', 'ADMIN'] },
@@ -50,6 +52,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Clock,
   CalendarClock,
   ShieldAlert,
+  Package,
 };
 
 interface SidebarProps {

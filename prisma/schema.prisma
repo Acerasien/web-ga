@@ -39,6 +39,14 @@ enum Location {
   OFFICE
 }
 
+enum AssetStatus {
+  AKTIF
+  RUSAK
+  DIPERBAIKI
+  HILANG
+}
+
+
 
 // ============================================================
 // MODELS
@@ -59,6 +67,7 @@ model Branch {
   transactions    Transaction[]
   ongoingPayments OngoingPayment[]
   recurringBills  RecurringBill[]
+  assets          Asset[]
 
   @@map("branches")
 }
@@ -81,6 +90,7 @@ model User {
   ongoingPayments OngoingPayment[]
   recurringBills  RecurringBill[]
   auditLogs       AuditLog[]
+  assets          Asset[]
 
   @@map("users")
 }
@@ -254,4 +264,34 @@ model AuditLog {
   @@index([createdAt(sort: Desc)], name: "idx_audit_created_at")
   @@index([userId], name: "idx_audit_user")
   @@map("audit_logs")
+}
+
+/// Aset / Inventaris Perusahaan (e.g. Laptop, Meja, Kendaraan)
+model Asset {
+  id             Int          @id @default(autoincrement())
+  branchId       Int          @map("branch_id")
+  userId         Int          @map("user_id")
+  assetTag       String?      @unique @map("asset_tag") @db.VarChar(50)
+  name           String       @db.VarChar(100)
+  brandModel     String?      @map("brand_model") @db.VarChar(100)
+  category       String       @db.VarChar(100)
+  locationDetail String?      @map("location_detail") @db.VarChar(255)
+  pic            String?      @db.VarChar(100)
+  status         AssetStatus  @default(AKTIF)
+  imagePath      String?      @map("image_path") @db.VarChar(500)
+  notes          String?      @db.Text
+  archivedAt     DateTime?    @map("archived_at") @db.Timestamptz
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  // Indexes for performance
+  @@index([branchId])
+  @@index([category])
+  @@index([status])
+  @@index([archivedAt])
+  @@map("assets")
 }

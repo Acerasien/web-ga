@@ -123,3 +123,44 @@ export interface NavItem {
   icon: string;
   roles: UserRole[];
 }
+
+// ============================================================
+// Asset Types
+// ============================================================
+
+export const ASSET_CATEGORIES = [
+  'Elektronik',
+  'Peralatan Kantor',
+  'Mebel & Furniture',
+  'Kendaraan',
+  'Peralatan Dapur & Mess',
+  'Perkakas & Alat Berat',
+  'Lain-lain'
+] as const;
+
+export type AssetCategory = typeof ASSET_CATEGORIES[number];
+
+export function isValidAssetCategory(category: string): category is AssetCategory {
+  return ASSET_CATEGORIES.includes(category as AssetCategory);
+}
+
+export function normalizeAssetCategory(category: string): AssetCategory | null {
+  const normalized = category.trim().toLowerCase();
+  const matched = ASSET_CATEGORIES.find(c => c.toLowerCase() === normalized);
+  return matched || null;
+}
+
+export interface AssetFormData {
+  assetTag?: string | null;
+  name: string;
+  brandModel?: string | null;
+  category: string;
+  locationDetail?: string | null;
+  pic?: string | null;
+  status: 'AKTIF' | 'RUSAK' | 'DIPERBAIKI' | 'HILANG';
+  imagePath?: string | null;
+  notes?: string | null;
+  branchId?: number;
+}
+
+

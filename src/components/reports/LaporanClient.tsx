@@ -364,12 +364,13 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
       }
 
       // Format RFC-4180 compliant CSV string (Poka-Yoke: wraps fields in double quotes)
-      const headers = ['Tanggal', 'Cabang', 'Kategori', 'Sub-Kategori', 'Deskripsi', 'Kuantitas', 'Satuan', 'Harga Satuan', 'Total Biaya', 'Pembayaran', 'Vendor', 'Catatan', 'Pencatat'];
+      const headers = ['Tanggal', 'Cabang', 'Kategori', 'Sub-Kategori', 'Lokasi', 'Deskripsi', 'Kuantitas', 'Satuan', 'Harga Satuan', 'Total Biaya', 'Pembayaran', 'Vendor', 'Catatan', 'Pencatat'];
       const rows = exportedTxs.map(tx => [
         new Date(tx.transactionDate).toISOString().split('T')[0],
         tx.branch.code,
         tx.category.name,
         tx.subCategory?.name || '',
+        tx.location || '',
         tx.description.replace(/"/g, '""'),
         Number(tx.quantity),
         tx.unit,
@@ -464,6 +465,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         'Cabang', 
         'Kategori', 
         'Sub-Kategori', 
+        'Lokasi', 
         'Deskripsi', 
         'Kuantitas', 
         'Satuan', 
@@ -480,6 +482,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         `${tx.branch.name} (${tx.branch.code})`,
         tx.category.name,
         tx.subCategory?.name || '',
+        tx.location || '',
         tx.description,
         Number(tx.quantity),
         tx.unit,
@@ -502,6 +505,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         { wch: 22 }, // Cabang
         { wch: 18 }, // Kategori
         { wch: 18 }, // Sub-Kategori
+        { wch: 12 }, // Lokasi
         { wch: 28 }, // Deskripsi
         { wch: 10 }, // Kuantitas
         { wch: 10 }, // Satuan
@@ -517,13 +521,13 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
       // 4. Format price columns as standard currency numbers (Rp #,##0)
       const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
       for (let r = 1; r <= range.e.r; r++) {
-        // Price per unit (Col index 7 / 'H')
-        const cellPrice = ws[XLSX.utils.encode_cell({ r, c: 7 })];
+        // Price per unit (Col index 8 / 'I')
+        const cellPrice = ws[XLSX.utils.encode_cell({ r, c: 8 })];
         if (cellPrice && cellPrice.t === 'n') {
           cellPrice.z = '"Rp "#,##0';
         }
-        // Total amount (Col index 8 / 'I')
-        const cellTotal = ws[XLSX.utils.encode_cell({ r, c: 8 })];
+        // Total amount (Col index 9 / 'J')
+        const cellTotal = ws[XLSX.utils.encode_cell({ r, c: 9 })];
         if (cellTotal && cellTotal.t === 'n') {
           cellTotal.z = '"Rp "#,##0';
         }
