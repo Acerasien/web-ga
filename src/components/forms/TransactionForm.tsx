@@ -70,6 +70,7 @@ export default function TransactionForm({ user, categories, branches, initialOng
   const [notes, setNotes] = useState<string>('');
   const [branchId, setBranchId] = useState<string>(initialOngoingPayment?.branchId ? String(initialOngoingPayment.branchId) : '');
   const [beritaAcara, setBeritaAcara] = useState<string>('');
+  const [invoiceNumber, setInvoiceNumber] = useState<string>('');
 
   // Dynamic custom fields states
   const [customFields, setCustomFields] = useState<Record<string, string | number>>({});
@@ -238,6 +239,7 @@ export default function TransactionForm({ user, categories, branches, initialOng
           notes: notes.trim() || undefined,
           customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
           beritaAcara: beritaAcara.trim() || undefined,
+          invoiceNumber: invoiceNumber.trim() || undefined,
           ongoingPaymentId: initialOngoingPayment?.id,
         };
 
@@ -273,6 +275,7 @@ export default function TransactionForm({ user, categories, branches, initialOng
     setCustomFields({});
     setSubCategoryId('');
     setBeritaAcara('');
+    setInvoiceNumber('');
     setLocation('');
     // Reset breakdown panel
     setBreakdownOpen(false);
@@ -356,6 +359,22 @@ export default function TransactionForm({ user, categories, branches, initialOng
                 placeholder="Contoh: 0001/BA-GA/HO/V/2026"
                 value={beritaAcara}
                 onChange={(e) => setBeritaAcara(e.target.value)}
+                disabled={isPending}
+              />
+            </div>
+
+            {/* Nomor Invoice (Optional Input) */}
+            <div className={styles.formGroup}>
+              <label htmlFor="invoiceNumber" className={styles.label}>
+                Nomor Invoice (Opsional)
+              </label>
+              <input
+                id="invoiceNumber"
+                type="text"
+                className={styles.input}
+                placeholder="Contoh: INV/2026/06/1023"
+                value={invoiceNumber}
+                onChange={(e) => setInvoiceNumber(e.target.value)}
                 disabled={isPending}
               />
             </div>
@@ -926,6 +945,13 @@ export default function TransactionForm({ user, categories, branches, initialOng
                   <span className={modalStyles.label}>Nomor Berita Acara</span>
                   <span className={modalStyles.value}>
                     {beritaAcara.trim() || '-'}
+                  </span>
+                </div>
+
+                <div className={modalStyles.item} style={{ gridColumn: 'span 2' }}>
+                  <span className={modalStyles.label}>Nomor Invoice</span>
+                  <span className={modalStyles.value}>
+                    {invoiceNumber.trim() || '-'}
                   </span>
                 </div>
 

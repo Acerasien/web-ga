@@ -72,6 +72,7 @@ export interface TransactionFormData {
   notes?: string;
   customFields?: Record<string, string | number>;
   beritaAcara?: string;
+  invoiceNumber?: string | null;
   ongoingPaymentId?: number;
 }
 

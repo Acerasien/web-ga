@@ -89,6 +89,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       const idxBranch = headers.findIndex(h => h.includes('cabang') || h.includes('branch'));
       const idxVendor = headers.findIndex(h => h.includes('vendor') || h.includes('supplier'));
       const idxBeritaAcara = headers.findIndex(h => h.includes('berita acara') || h.includes('berita_acara') || h === 'ba');
+      const idxInvoice = headers.findIndex(h => h.includes('invoice') || h.includes('faktur') || h === 'inv' || h.includes('no_inv'));
 
       // Validate mandatory columns exist in headers
       if (idxDate === -1 || idxCategory === -1 || idxDescription === -1 || idxQuantity === -1 || idxUnit === -1 || idxPrice === -1) {
@@ -127,6 +128,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         const branchRaw = idxBranch !== -1 ? String(row[idxBranch] || '').trim() : '';
         const vendorRaw = idxVendor !== -1 ? String(row[idxVendor] || '').trim() : '';
         const beritaAcaraRaw = idxBeritaAcara !== -1 ? String(row[idxBeritaAcara] || '').trim() : '';
+        const invoiceNumberRaw = idxInvoice !== -1 ? String(row[idxInvoice] || '').trim() : '';
 
         // Validation rules
         const errors: string[] = [];
@@ -152,6 +154,10 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
           }
         }
 
+        if (invoiceNumberRaw && invoiceNumberRaw.length > 100) {
+          errors.push('Nomor Invoice maksimal 100 karakter');
+        }
+
         if (errors.length > 0) {
           hasErrors = true;
         }
@@ -171,6 +177,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
           branch: branchRaw,
           vendor: vendorRaw,
           beritaAcara: beritaAcaraRaw,
+          invoiceNumber: invoiceNumberRaw,
           errors,
         };
       });
@@ -333,7 +340,8 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       "Lokasi",
       "Vendor",
       "Catatan",
-      "Berita Acara"
+      "Berita Acara",
+      "Nomor Invoice"
     ];
 
     const sampleRows = [
@@ -349,7 +357,8 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         "Office",
         "RM Padang Sinar",
         "Makan siang rapat bulanan GA",
-        "0001/BA-GA/HO/V/2026"
+        "0001/BA-GA/HO/V/2026",
+        "INV-001/RM-PADANG/V/2026"
       ],
       [
         "2026-05-19",
@@ -363,7 +372,8 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         "Site",
         "Toko Buku Jaya",
         "Stok kertas printer kantor",
-        "0002/BA-GA/HO/V/2026"
+        "0002/BA-GA/HO/V/2026",
+        ""
       ]
     ];
 
@@ -385,7 +395,8 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       { wch: 12 }, // Lokasi
       { wch: 20 }, // Vendor
       { wch: 30 }, // Catatan
-      { wch: 25 }  // Berita Acara
+      { wch: 25 }, // Berita Acara
+      { wch: 25 }  // Nomor Invoice
     ];
     ws['!cols'] = wscols;
 

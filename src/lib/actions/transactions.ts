@@ -58,6 +58,7 @@ export async function createTransaction(
       notes,
       customFields,
       beritaAcara,
+      invoiceNumber,
     } = data;
 
     // Fail-fast on required primary field parameters
@@ -89,6 +90,9 @@ export async function createTransaction(
     }
     if (beritaAcara && beritaAcara.length > 50) {
       return { success: false, error: 'Nomor Berita Acara maksimal 50 karakter.' };
+    }
+    if (invoiceNumber && invoiceNumber.length > 100) {
+      return { success: false, error: 'Nomor Invoice maksimal 100 karakter.' };
     }
 
     // Determine target Branch ID based on role permissions
@@ -194,6 +198,7 @@ export async function createTransaction(
               notes: notes?.trim() || null,
               customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,
               beritaAcara: finalBeritaAcara,
+              invoiceNumber: invoiceNumber?.trim() || null,
             },
           });
           
@@ -244,6 +249,7 @@ export async function createTransaction(
             notes: notes?.trim() || null,
             customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,
             beritaAcara: finalBeritaAcara,
+            invoiceNumber: invoiceNumber?.trim() || null,
           },
         });
 
@@ -780,6 +786,7 @@ export async function updateTransaction(
       notes,
       customFields,
       beritaAcara,
+      invoiceNumber,
     } = data;
 
     // Fetch existing transaction first
@@ -828,6 +835,9 @@ export async function updateTransaction(
     }
     if (beritaAcara && beritaAcara.length > 50) {
       return { success: false, error: 'Nomor Berita Acara maksimal 50 karakter.' };
+    }
+    if (invoiceNumber && invoiceNumber.length > 100) {
+      return { success: false, error: 'Nomor Invoice maksimal 100 karakter.' };
     }
 
     // Determine target Branch ID based on role permissions
@@ -907,6 +917,7 @@ export async function updateTransaction(
           notes: notes?.trim() || null,
           customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,
           beritaAcara: finalBeritaAcara,
+          invoiceNumber: invoiceNumber?.trim() || null,
         },
       });
 

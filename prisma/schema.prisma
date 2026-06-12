@@ -157,6 +157,7 @@ model Transaction {
   notes           String?       @db.Text
   customFields    Json?         @map("custom_fields") @db.JsonB
   beritaAcara     String?       @unique @map("berita_acara") @db.VarChar(50)
+  invoiceNumber   String?       @map("invoice_number") @db.VarChar(100)
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 

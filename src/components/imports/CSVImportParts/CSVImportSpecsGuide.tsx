@@ -23,7 +23,7 @@ export default function CSVImportSpecsGuide({
         </span>
         
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 6px', marginTop: '6px', marginBottom: '6px' }}>
-          {['Tanggal', 'Kategori', 'Sub-Kategori', 'Deskripsi', 'Kuantitas', 'Satuan', 'Harga Satuan', 'Pembayaran', 'Lokasi', 'Vendor', 'Catatan'].map(col => (
+          {['Tanggal', 'Kategori', 'Sub-Kategori', 'Deskripsi', 'Kuantitas', 'Satuan', 'Harga Satuan', 'Pembayaran', 'Lokasi', 'Vendor', 'Catatan', 'Berita Acara', 'Nomor Invoice'].map(col => (
             <span key={col} style={{ 
               fontSize: '10px', 
               fontFamily: 'var(--font-mono)', 

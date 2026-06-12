@@ -159,6 +159,7 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
     const idxNotes = headers.findIndex(h => h.includes('catatan') || h.includes('notes'));
     const idxBranch = headers.findIndex(h => h.includes('cabang') || h.includes('branch'));
     const idxBeritaAcara = headers.findIndex(h => h.includes('berita acara') || h.includes('berita_acara') || h === 'ba');
+    const idxInvoice = headers.findIndex(h => h.includes('invoice') || h.includes('faktur') || h === 'inv' || h.includes('no_inv'));
 
     // Check mandatory header columns
     if (idxDate === -1 || idxCategory === -1 || idxDescription === -1 || idxQuantity === -1 || idxUnit === -1 || idxPrice === -1) {
@@ -334,6 +335,15 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
           }
         }
 
+        // 9. Invoice Number extraction
+        let invoiceNumber: string | null = null;
+        if (idxInvoice !== -1 && row[idxInvoice]) {
+          const invVal = row[idxInvoice].trim();
+          if (invVal !== '') {
+            invoiceNumber = invVal;
+          }
+        }
+
         // Populate object into temporary buffer
         transactionsToInsert.push({
           transactionDate,
@@ -352,6 +362,7 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
           notes,
           customFields: Prisma.DbNull, // CSV imports do not map complex custom categories forms natively
           beritaAcara,
+          invoiceNumber,
         });
 
       } catch (err: any) {

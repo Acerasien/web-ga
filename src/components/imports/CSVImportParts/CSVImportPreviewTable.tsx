@@ -79,6 +79,8 @@ export default function CSVImportPreviewTable({ previewSummary, previewRows }: C
                   <th>Pembayaran</th>
                   <th>Lokasi</th>
                   <th>Vendor Mapped</th>
+                  <th>No. BA</th>
+                  <th>No. Invoice</th>
                   <th>Keterangan</th>
                 </tr>
               </thead>
@@ -112,6 +114,10 @@ export default function CSVImportPreviewTable({ previewSummary, previewRows }: C
                         ) : '-'}
                       </td>
                       <td>{row.vendor || '-'}</td>
+                      <td>{row.beritaAcara || '-'}</td>
+                      <td className={row.errors.some((e: string) => e.includes('Invoice')) ? styles.errorCell : ''} title={row.errors.find((e: string) => e.includes('Invoice')) || ''}>
+                        {row.invoiceNumber || '-'}
+                      </td>
                       <td>
                         {isRowInvalid ? (
                           <span style={{ color: 'var(--color-danger)', fontWeight: 600, fontSize: '10px' }} title={row.errors.join(', ')}>
