@@ -18,6 +18,7 @@ import type { CategoryWithSub } from '@/lib/actions/categories';
 import type { AuthUser } from '@/types';
 import { formatRupiah, formatPaymentMethod } from '@/lib/formatters';
 import styles from '@/app/(dashboard)/transaksi/import/import.module.css';
+import { readExcelOrCsvFile } from '@/lib/excel';
 
 interface CSVImportClientProps {
   user: AuthUser;
@@ -29,7 +30,26 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
   const [csvText, setCsvText] = useState<string>('');
   
   // Preview states
-  const [previewRows, setPreviewRows] = useState<any[]>([]);
+  interface PreviewRow {
+    rowNum: number;
+    date: string;
+    category: string;
+    subCategory: string;
+    description: string;
+    quantity: number;
+    unit: string;
+    pricePerUnit: number;
+    subtotal: number;
+    paymentMethod: string;
+    location: string;
+    branch: string;
+    vendor: string;
+    beritaAcara: string;
+    invoiceNumber: string;
+    errors: string[];
+  }
+
+  const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [previewSummary, setPreviewSummary] = useState<{
     totalRows: number;
     totalAmount: number;
@@ -67,7 +87,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
 
   const generatePreview = (worksheet: XLSX.WorkSheet) => {
     try {
-      const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+      const rawRows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1 });
       if (rawRows.length < 2) {
         setPreviewRows([]);
         setPreviewSummary({ totalRows: 0, totalAmount: 0, hasErrors: true });
@@ -75,7 +95,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       }
 
       // Map headers dynamically (case-insensitive and trimmed)
-      const headers = rawRows[0].map((h: any) => String(h || '').trim().toLowerCase());
+      const headers = (rawRows[0] || []).map((h) => String(h || '').trim().toLowerCase());
       
       const idxDate = headers.findIndex(h => h.includes('tanggal') || h.includes('date'));
       const idxCategory = headers.findIndex(h => h.includes('kategori') || h.includes('category'));
@@ -98,13 +118,13 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         return;
       }
 
-      const dataRows = rawRows.slice(1).filter(r => r.length > 0 && r.some(val => val !== undefined && val !== null && String(val).trim() !== ''));
+      const dataRows = rawRows.slice(1).filter((r): r is unknown[] => Array.isArray(r) && r.length > 0 && r.some(val => val !== undefined && val !== null && String(val).trim() !== ''));
 
       let totalAmount = 0;
       let hasErrors = false;
       const seenBAs = new Set<string>();
 
-      const parsedRows = dataRows.map((row: any[], index: number) => {
+      const parsedRows = dataRows.map((row: unknown[], index: number) => {
         const rowNum = index + 2;
         const dateRaw = idxDate !== -1 ? String(row[idxDate] || '').trim() : '';
         const categoryRaw = idxCategory !== -1 ? String(row[idxCategory] || '').trim() : '';
@@ -197,80 +217,24 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
   };
 
   const processFile = (selectedFile: File) => {
-    const isExcel = selectedFile.name.endsWith('.xlsx') || selectedFile.name.endsWith('.xls');
-    const isCsv = selectedFile.name.endsWith('.csv');
-
-    if (!isExcel && !isCsv) {
-      setGeneralError('Format file salah. Hanya file .csv, .xlsx, atau .xls yang diperbolehkan.');
-      setFile(null);
-      setCsvText('');
-      setPreviewRows([]);
-      setPreviewSummary(null);
-      return;
-    }
-    
     setFile(selectedFile);
     setGeneralError(null);
     setResult(null);
 
-    const reader = new FileReader();
-
-    if (isExcel) {
-      reader.onload = (e) => {
-        try {
-          if (e.target?.result) {
-            const data = new Uint8Array(e.target.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-
-            // Normalize Date cells to standard YYYY-MM-DD string format
-            for (const key in worksheet) {
-              if (key[0] === '!') continue;
-              const cell = worksheet[key];
-              if (cell && (cell.t === 'd' || cell.v instanceof Date)) {
-                const date = cell.v instanceof Date ? cell.v : new Date(cell.v);
-                if (!isNaN(date.getTime())) {
-                  // Add 12 hours to handle local timezone / historical offset discrepancies (e.g. 23:59:48 instead of 00:00:00)
-                  const adjusted = new Date(date.getTime() + 12 * 60 * 60 * 1000);
-                  const yyyy = adjusted.getFullYear();
-                  const mm = String(adjusted.getMonth() + 1).padStart(2, '0');
-                  const dd = String(adjusted.getDate()).padStart(2, '0');
-                  const formatted = `${yyyy}-${mm}-${dd}`;
-                  cell.t = 's';
-                  cell.v = formatted;
-                  cell.w = formatted;
-                }
-              }
-            }
-
-            const csvContent = XLSX.utils.sheet_to_csv(worksheet);
-            setCsvText(csvContent);
-            generatePreview(worksheet);
-          }
-        } catch (err) {
-          console.error('Error parsing Excel file:', err);
-          setGeneralError('Gagal membaca file Excel. Pastikan file tidak rusak.');
-        }
-      };
-      reader.readAsArrayBuffer(selectedFile);
-    } else {
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          const csvTextContent = e.target.result as string;
-          setCsvText(csvTextContent);
-          try {
-            const workbook = XLSX.read(csvTextContent, { type: 'string' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            generatePreview(worksheet);
-          } catch (err) {
-            console.error('Error preparing CSV preview:', err);
-          }
-        }
-      };
-      reader.readAsText(selectedFile);
-    }
+    readExcelOrCsvFile(
+      selectedFile,
+      (csvContent, worksheet) => {
+        setCsvText(csvContent);
+        generatePreview(worksheet);
+      },
+      (errorMsg) => {
+        setGeneralError(errorMsg);
+        setFile(null);
+        setCsvText('');
+        setPreviewRows([]);
+        setPreviewSummary(null);
+      }
+    );
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -415,7 +379,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
     }
 
     const headers = ['Kategori', 'Sub-Kategori'];
-    const rows: any[][] = [];
+    const rows: string[][] = [];
 
     categories.forEach(cat => {
       if (cat.subCategories.length === 0) {

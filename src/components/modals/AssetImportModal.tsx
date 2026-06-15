@@ -18,6 +18,7 @@ import type { CSVImportResult } from '@/lib/actions/assets';
 import type { Branch } from '@prisma/client';
 import { type AuthUser, normalizeAssetCategory } from '@/types';
 import styles from './modal.module.css';
+import { readExcelOrCsvFile } from '@/lib/excel';
 
 interface AssetImportModalProps {
   isOpen: boolean;
@@ -39,7 +40,22 @@ export default function AssetImportModal({
   const [csvText, setCsvText] = useState<string>('');
   
   // Preview states
-  const [previewRows, setPreviewRows] = useState<any[]>([]);
+  interface AssetPreviewRow {
+    rowNum: number;
+    name: string;
+    category: string;
+    assetTag: string;
+    brandModel: string;
+    pic: string;
+    locationDetail: string;
+    status: string;
+    branch: string;
+    notes: string;
+    purchaseYear: string;
+    errors: string[];
+  }
+
+  const [previewRows, setPreviewRows] = useState<AssetPreviewRow[]>([]);
   const [previewSummary, setPreviewSummary] = useState<{
     totalRows: number;
     hasErrors: boolean;
@@ -68,7 +84,7 @@ export default function AssetImportModal({
 
   const generatePreview = (worksheet: XLSX.WorkSheet) => {
     try {
-      const rawRows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+      const rawRows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1 });
       if (rawRows.length < 2) {
         setPreviewRows([]);
         setPreviewSummary({ totalRows: 0, hasErrors: true, errorCount: 1 });
@@ -76,7 +92,7 @@ export default function AssetImportModal({
       }
 
       // Map headers dynamically (case-insensitive and trimmed)
-      const headers = rawRows[0].map((h: any) => String(h || '').trim().toLowerCase());
+      const headers = (rawRows[0] || []).map((h) => String(h || '').trim().toLowerCase());
       
       const idxTag = headers.findIndex(h => h.includes('tag') || h.includes('kode') || h === 'code');
       const idxName = headers.findIndex(h => h === 'nama' || h === 'name' || h.includes('barang') || h.includes('aset'));
@@ -97,12 +113,12 @@ export default function AssetImportModal({
         return;
       }
 
-      const dataRows = rawRows.slice(1).filter(r => r.length > 0 && r.some(val => val !== undefined && val !== null && String(val).trim() !== ''));
+      const dataRows = rawRows.slice(1).filter((r): r is unknown[] => Array.isArray(r) && r.length > 0 && r.some(val => val !== undefined && val !== null && String(val).trim() !== ''));
 
       let errorCount = 0;
       const seenTags = new Set<string>();
 
-      const parsedRows = dataRows.map((row: any[], index: number) => {
+      const parsedRows = dataRows.map((row: unknown[], index: number) => {
         const rowNum = index + 2;
         const nameRaw = idxName !== -1 ? String(row[idxName] || '').trim() : '';
         const categoryRaw = idxCategory !== -1 ? String(row[idxCategory] || '').trim() : '';
@@ -223,60 +239,24 @@ export default function AssetImportModal({
   };
 
   const processFile = (selectedFile: File) => {
-    const isExcel = selectedFile.name.endsWith('.xlsx') || selectedFile.name.endsWith('.xls');
-    const isCsv = selectedFile.name.endsWith('.csv');
-
-    if (!isExcel && !isCsv) {
-      setGeneralError('Format file salah. Hanya file .csv, .xlsx, atau .xls yang diperbolehkan.');
-      setFile(null);
-      setCsvText('');
-      setPreviewRows([]);
-      setPreviewSummary(null);
-      return;
-    }
-    
     setFile(selectedFile);
     setGeneralError(null);
     setResult(null);
 
-    const reader = new FileReader();
-
-    if (isExcel) {
-      reader.onload = (e) => {
-        try {
-          if (e.target?.result) {
-            const data = new Uint8Array(e.target.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-
-            const csvContent = XLSX.utils.sheet_to_csv(worksheet);
-            setCsvText(csvContent);
-            generatePreview(worksheet);
-          }
-        } catch (err) {
-          console.error('Error parsing Excel file:', err);
-          setGeneralError('Gagal membaca file Excel. Pastikan file tidak rusak.');
-        }
-      };
-      reader.readAsArrayBuffer(selectedFile);
-    } else {
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          const csvTextContent = e.target.result as string;
-          setCsvText(csvTextContent);
-          try {
-            const workbook = XLSX.read(csvTextContent, { type: 'string' });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            generatePreview(worksheet);
-          } catch (err) {
-            console.error('Error preparing CSV preview:', err);
-          }
-        }
-      };
-      reader.readAsText(selectedFile);
-    }
+    readExcelOrCsvFile(
+      selectedFile,
+      (csvContent, worksheet) => {
+        setCsvText(csvContent);
+        generatePreview(worksheet);
+      },
+      (errorMsg) => {
+        setGeneralError(errorMsg);
+        setFile(null);
+        setCsvText('');
+        setPreviewRows([]);
+        setPreviewSummary(null);
+      }
+    );
   };
 
   const handleDrop = (e: React.DragEvent) => {

@@ -3,55 +3,14 @@
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/actions/auth';
 import type { ApiResponse } from '@/types';
-import { PaymentMethod, Prisma } from '@prisma/client';
+import { PaymentMethod, Prisma, Location } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import { parseCSV } from '@/lib/csv';
 
 export interface CSVImportResult {
   totalRows: number;
   importedCount: number;
   errors: string[];
-}
-
-function parseCSV(text: string): string[][] {
-  // Dynamically determine delimiter based on header density (Excel compatibility)
-  const firstLine = text.split(/\r?\n/)[0] || '';
-  const commaCount = (firstLine.match(/,/g) || []).length;
-  const semicolonCount = (firstLine.match(/;/g) || []).length;
-  const delimiter = semicolonCount > commaCount ? ';' : ',';
-
-  const lines: string[][] = [];
-  let row: string[] = [''];
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    const next = text[i + 1];
-
-    if (c === '"') {
-      if (inQuotes && next === '"') {
-        row[row.length - 1] += '"';
-        i++; // skip next quote
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (c === delimiter && !inQuotes) {
-      row.push('');
-    } else if ((c === '\r' || c === '\n') && !inQuotes) {
-      if (c === '\r' && next === '\n') {
-        i++;
-      }
-      lines.push(row);
-      row = [''];
-    } else {
-      row[row.length - 1] += c;
-    }
-  }
-
-  if (row.length > 1 || row[0] !== '') {
-    lines.push(row);
-  }
-
-  return lines;
 }
 
 /**
@@ -309,11 +268,11 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
         const vendor = idxVendor !== -1 ? row[idxVendor]?.trim() || null : null;
         const notes = idxNotes !== -1 ? row[idxNotes]?.trim() || null : null;
 
-        let locationVal: any = null;
+        let locationVal: Location | null = null;
         if (idxLocation !== -1 && row[idxLocation] && row[idxLocation].trim() !== '') {
           const locRaw = row[idxLocation].trim().toUpperCase();
           if (locRaw === 'SITE' || locRaw === 'MESS' || locRaw === 'OFFICE') {
-            locationVal = locRaw;
+            locationVal = locRaw as Location;
           } else {
             throw new Error(`Lokasi '${row[idxLocation]}' tidak valid. Harus salah satu dari: Site, Mess, Office.`);
           }
@@ -365,8 +324,9 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
           invoiceNumber,
         });
 
-      } catch (err: any) {
-        importErrors.push(`Baris ${rowNum}: ${err.message || 'Format data salah.'}`);
+      } catch (err) {
+        const error = err as Error;
+        importErrors.push(`Baris ${rowNum}: ${error.message || 'Format data salah.'}`);
       }
     }
 
@@ -385,7 +345,7 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
 
     // Bulk insert transactions in a single, safe Prisma batch transaction
     await prisma.$transaction(
-      transactionsToInsert.map(tx => prisma.transaction.create({ data: tx as any }))
+      transactionsToInsert.map(tx => prisma.transaction.create({ data: tx as Prisma.TransactionUncheckedCreateInput }))
     );
 
     // Revalidate paths cache for active GA pages

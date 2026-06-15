@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { X, Upload, FileSpreadsheet, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react';
 import { importTransactions } from '@/lib/actions/imports';
 import type { CSVImportResult } from '@/lib/actions/imports';
+import { readExcelOrCsvFile } from '@/lib/excel';
 import styles from './modal.module.css';
 
 interface CSVImportModalProps {
@@ -39,68 +40,21 @@ export default function CSVImportModal({ isOpen, onClose, onImportSuccess }: CSV
   };
 
   const processFile = (selectedFile: File) => {
-    const isExcel = selectedFile.name.endsWith('.xlsx') || selectedFile.name.endsWith('.xls');
-    const isCsv = selectedFile.name.endsWith('.csv');
-
-    if (!isExcel && !isCsv) {
-      setGeneralError('Format file salah. Hanya file .csv, .xlsx, atau .xls yang diperbolehkan.');
-      setFile(null);
-      setCsvText('');
-      return;
-    }
-    
     setFile(selectedFile);
     setGeneralError(null);
     setResult(null);
 
-    const reader = new FileReader();
-
-    if (isExcel) {
-      reader.onload = (e) => {
-        try {
-          if (e.target?.result) {
-            const data = new Uint8Array(e.target.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-
-            // Normalize Date cells to standard YYYY-MM-DD string format
-            for (const key in worksheet) {
-              if (key[0] === '!') continue;
-              const cell = worksheet[key];
-              if (cell && (cell.t === 'd' || cell.v instanceof Date)) {
-                const date = cell.v instanceof Date ? cell.v : new Date(cell.v);
-                if (!isNaN(date.getTime())) {
-                  // Add 12 hours to handle local timezone / historical offset discrepancies (e.g. 23:59:48 instead of 00:00:00)
-                  const adjusted = new Date(date.getTime() + 12 * 60 * 60 * 1000);
-                  const yyyy = adjusted.getFullYear();
-                  const mm = String(adjusted.getMonth() + 1).padStart(2, '0');
-                  const dd = String(adjusted.getDate()).padStart(2, '0');
-                  const formatted = `${yyyy}-${mm}-${dd}`;
-                  cell.t = 's';
-                  cell.v = formatted;
-                  cell.w = formatted;
-                }
-              }
-            }
-
-            const csvContent = XLSX.utils.sheet_to_csv(worksheet);
-            setCsvText(csvContent);
-          }
-        } catch (err) {
-          console.error('Error parsing Excel file:', err);
-          setGeneralError('Gagal membaca file Excel. Pastikan file tidak rusak.');
-        }
-      };
-      reader.readAsArrayBuffer(selectedFile);
-    } else {
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          setCsvText(e.target.result as string);
-        }
-      };
-      reader.readAsText(selectedFile);
-    }
+    readExcelOrCsvFile(
+      selectedFile,
+      (csvContent) => {
+        setCsvText(csvContent);
+      },
+      (errorMsg) => {
+        setGeneralError(errorMsg);
+        setFile(null);
+        setCsvText('');
+      }
+    );
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -273,7 +227,7 @@ export default function CSVImportModal({ isOpen, onClose, onImportSuccess }: CSV
                   * Tanggal mendukung format <code style={{ fontWeight: 600 }}>YYYY-MM-DD</code> atau <code style={{ fontWeight: 600 }}>DD/MM/YYYY</code>.
                 </span>
                 <span style={{ display: 'block', marginTop: '2px', fontSize: '10px' }}>
-                  * Kategori yang tidak terdaftar otomatis dimasukkan ke <code style={{ fontWeight: 600 }}>"Lain-lain"</code>.
+                  * Kategori yang tidak terdaftar otomatis dimasukkan ke <code style={{ fontWeight: 600 }}>&quot;Lain-lain&quot;</code>.
                 </span>
 
                 <div style={{ marginTop: 'var(--space-3)', borderTop: '1px solid rgba(59, 130, 246, 0.1)', paddingTop: 'var(--space-2)' }}>

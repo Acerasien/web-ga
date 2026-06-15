@@ -7,6 +7,7 @@ import { createAuditLog } from '@/lib/actions/audit';
 import type { AssetFormData, ApiResponse } from '@/types';
 import { normalizeAssetCategory } from '@/types';
 import { AssetStatus, Prisma } from '@prisma/client';
+import { parseCSV } from '@/lib/csv';
 
 export interface AssetWithRelations {
   id: number;
@@ -404,46 +405,7 @@ export async function archiveAsset(id: number): Promise<ApiResponse<void>> {
   }
 }
 
-function parseCSV(text: string): string[][] {
-  const firstLine = text.split(/\r?\n/)[0] || '';
-  const commaCount = (firstLine.match(/,/g) || []).length;
-  const semicolonCount = (firstLine.match(/;/g) || []).length;
-  const delimiter = semicolonCount > commaCount ? ';' : ',';
 
-  const lines: string[][] = [];
-  let row: string[] = [''];
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    const next = text[i + 1];
-
-    if (c === '"') {
-      if (inQuotes && next === '"') {
-        row[row.length - 1] += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (c === delimiter && !inQuotes) {
-      row.push('');
-    } else if ((c === '\r' || c === '\n') && !inQuotes) {
-      if (c === '\r' && next === '\n') {
-        i++;
-      }
-      lines.push(row);
-      row = [''];
-    } else {
-      row[row.length - 1] += c;
-    }
-  }
-
-  if (row.length > 1 || row[0] !== '') {
-    lines.push(row);
-  }
-
-  return lines;
-}
 
 export interface CSVImportResult {
   totalRows: number;
