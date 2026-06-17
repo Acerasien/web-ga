@@ -402,3 +402,136 @@
     transform: translateY(0);
   }
 }
+
+/* ============================================================
+   Bulk Selection & Floating Actions Styles
+   ============================================================ */
+.checkboxCol {
+  width: 48px;
+  text-align: center !important;
+  padding: var(--space-4) var(--space-2) !important;
+}
+
+.checkboxCell {
+  text-align: center !important;
+  padding: var(--space-4) var(--space-2) !important;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  transition: transform 0.1s ease;
+}
+
+.checkbox:active {
+  transform: scale(0.9);
+}
+
+.floatingBar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: var(--radius-xl);
+  padding: var(--space-3) var(--space-6);
+  box-shadow: var(--shadow-xl);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  z-index: 100;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+  opacity: 0;
+  pointer-events: none;
+  width: 90%;
+  max-width: 480px;
+}
+
+.floatingBarActive {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+:global(.dark) .floatingBar {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(51, 65, 85, 0.8);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+}
+
+.floatingBarInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.floatingBarCount {
+  background: var(--color-primary);
+  color: white;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.floatingBarBtn {
+  background: var(--color-danger);
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.floatingBarBtn:hover {
+  background: #dc2626;
+}
+
+.floatingBarBtn:active {
+  transform: scale(0.97);
+}
+
+.confirmationInput {
+  width: 100%;
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  margin-top: var(--space-3);
+  transition: all var(--transition-fast);
+}
+
+.confirmationInput:focus {
+  outline: none;
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.trSelected {
+  background-color: rgba(59, 130, 246, 0.04) !important;
+}
+
+.trSelected:hover {
+  background-color: rgba(59, 130, 246, 0.07) !important;
+}
+

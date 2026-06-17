@@ -578,6 +578,101 @@ export async function deleteTransaction(id: number): Promise<ApiResponse<{ succe
 }
 
 /**
+ * Server Action to delete multiple expense transactions permanently (Superadmin Only).
+ */
+export async function deleteTransactions(ids: number[]): Promise<ApiResponse<{ count: number }>> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: 'Sesi Anda telah berakhir. Silakan masuk kembali.',
+      };
+    }
+
+    if (user.role !== 'SUPERADMIN') {
+      return {
+        success: false,
+        error: 'Akses ditolak. Hanya administrator yang dapat menghapus data pengeluaran.',
+      };
+    }
+
+    if (!ids || ids.length === 0) {
+      return {
+        success: false,
+        error: 'Tidak ada transaksi yang dipilih untuk dihapus.',
+      };
+    }
+
+    // Fetch details of all matching transactions before deletion for audit logging
+    const targetTxs = await prisma.transaction.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, description: true, totalAmount: true },
+    });
+
+    if (targetTxs.length === 0) {
+      return {
+        success: false,
+        error: 'Transaksi yang dipilih tidak ditemukan.',
+      };
+    }
+
+    // Perform database operations in transaction to guarantee consistency
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete associated Ongoing Payments
+      await tx.ongoingPayment.deleteMany({
+        where: { transactionId: { in: ids } },
+      });
+
+      // 2. Delete the transactions
+      await tx.transaction.deleteMany({
+        where: { id: { in: ids } },
+      });
+
+      // 3. Create single bulk audit log entry summarizing all deleted items
+      const totalAmount = targetTxs.reduce((sum, item) => sum.add(item.totalAmount), new Prisma.Decimal(0));
+      const deletedDescriptions = targetTxs.map(t => `"${t.description}" (Rp ${Number(t.totalAmount).toLocaleString('id-ID')})`).join(', ');
+      
+      await createAuditLog({
+        userId: user.id,
+        actionType: 'DELETE',
+        targetTable: 'Transaction',
+        targetId: ids.join(','),
+        description: `Menghapus masal ${targetTxs.length} transaksi senilai Rp ${Number(totalAmount).toLocaleString('id-ID')}: ${deletedDescriptions}`,
+      }, tx);
+
+      // 4. Create individual audit log entries for each deleted transaction
+      for (const t of targetTxs) {
+        await createAuditLog({
+          userId: user.id,
+          actionType: 'DELETE',
+          targetTable: 'Transaction',
+          targetId: String(t.id),
+          description: `Menghapus transaksi ID ${t.id} secara masal: "${t.description}" senilai Rp ${Number(t.totalAmount).toLocaleString('id-ID')}`,
+        }, tx);
+      }
+    });
+
+    // Clear router cache tags to trigger live layout refreshes
+    revalidatePath('/dashboard');
+    revalidatePath('/transaksi/riwayat');
+    revalidatePath('/ongoing/list');
+
+    return {
+      success: true,
+      message: `${targetTxs.length} transaksi berhasil dihapus secara permanen.`,
+      data: { count: targetTxs.length }
+    };
+  } catch (error) {
+    console.error('Error inside deleteTransactions Server Action:', error);
+    return {
+      success: false,
+      error: 'Terjadi kesalahan sistem saat menghapus daftar transaksi.',
+    };
+  }
+}
+
+/**
  * Server Action to fetch a single transaction with all its relations for detail view.
  */
 export async function getTransactionById(

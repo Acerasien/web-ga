@@ -13,10 +13,12 @@ import {
   FileSpreadsheet,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import Link from 'next/link';
-import { getTransactions } from '@/lib/actions/transactions';
+import { getTransactions, deleteTransactions } from '@/lib/actions/transactions';
 import type { TransactionWithRelations } from '@/lib/actions/transactions';
 import type { CategoryWithSub } from '@/lib/actions/categories';
 import type { Branch, PaymentMethod } from '@prisma/client';
@@ -24,6 +26,7 @@ import type { AuthUser } from '@/types';
 import { formatRupiah } from '@/lib/formatters';
 import TransactionDetailModal from '@/components/modals/TransactionDetailModal';
 import styles from '@/app/(dashboard)/transaksi/riwayat/history.module.css';
+import stylesModal from '@/components/modals/modal.module.css';
 
 interface HistoryContainerProps {
   user: AuthUser;
@@ -32,6 +35,13 @@ interface HistoryContainerProps {
 }
 
 export default function HistoryContainer({ user, categories, branches }: HistoryContainerProps) {
+  // Bulk Selection States
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkModalOpen, setBulkModalOpen] = useState<boolean>(false);
+  const [confirmText, setConfirmText] = useState<string>('');
+  const [bulkDeleting, setBulkDeleting] = useState<boolean>(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
+
   // Filter States
   const [search, setSearch] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
@@ -89,6 +99,7 @@ export default function HistoryContainer({ user, categories, branches }: History
   // 2. Query transactions from Server Action on dependencies trigger
   useEffect(() => {
     const loadTransactions = async () => {
+      setSelectedIds(new Set());
       setLoading(true);
       setError(null);
       try {
@@ -145,6 +156,43 @@ export default function HistoryContainer({ user, categories, branches }: History
     setPage(1);
     setSortBy('transactionDate');
     setSortOrder('desc');
+  };
+
+  // Toggle selection for a single row
+  const handleToggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // Bulk Delete Submission Handler
+  const handleBulkDelete = async () => {
+    if (confirmText !== 'HAPUS') return;
+    setBulkDeleting(true);
+    setBulkDeleteError(null);
+    try {
+      const idsToDelete = Array.from(selectedIds);
+      const res = await deleteTransactions(idsToDelete);
+      if (res.success) {
+        setBulkModalOpen(false);
+        setConfirmText('');
+        setSelectedIds(new Set());
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        setBulkDeleteError(res.error || 'Gagal menghapus transaksi terpilih.');
+      }
+    } catch (err) {
+      console.error('Bulk delete client error:', err);
+      setBulkDeleteError('Koneksi terputus. Gagal menghubungi server.');
+    } finally {
+      setBulkDeleting(false);
+    }
   };
 
   // Click row handlers
@@ -372,6 +420,23 @@ export default function HistoryContainer({ user, categories, branches }: History
               <table className={styles.table}>
                 <thead>
                   <tr>
+                    {user.role === 'SUPERADMIN' && (
+                      <th className={styles.checkboxCol}>
+                        <input
+                          type="checkbox"
+                          className={styles.checkbox}
+                          checked={transactions.length > 0 && transactions.every(tx => selectedIds.has(tx.id))}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds(new Set(transactions.map(tx => tx.id)));
+                            } else {
+                              setSelectedIds(new Set());
+                            }
+                          }}
+                          aria-label="Pilih semua transaksi di halaman ini"
+                        />
+                      </th>
+                    )}
                     <th className={styles.th} onClick={() => handleSort('transactionDate')} style={{ cursor: 'pointer', userSelect: 'none' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <span>Tanggal</span>
@@ -425,10 +490,21 @@ export default function HistoryContainer({ user, categories, branches }: History
                   {transactions.map((tx) => (
                     <tr 
                       key={tx.id} 
-                      className={styles.tr} 
+                      className={`${styles.tr} ${selectedIds.has(tx.id) ? styles.trSelected : ''}`}
                       onClick={() => handleRowClick(tx)}
                       title="Klik untuk melihat detail lengkap transaksi ini"
                     >
+                      {user.role === 'SUPERADMIN' && (
+                        <td className={styles.checkboxCell} onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            className={styles.checkbox}
+                            checked={selectedIds.has(tx.id)}
+                            onChange={() => handleToggleSelect(tx.id)}
+                            aria-label={`Pilih transaksi ${tx.description}`}
+                          />
+                        </td>
+                      )}
                       <td className={styles.td}>
                         {new Date(tx.transactionDate).toLocaleDateString('id-ID', {
                           day: 'numeric',
@@ -551,6 +627,156 @@ export default function HistoryContainer({ user, categories, branches }: History
           setSelectedTransaction(null);
         }}
       />
+
+      {/* Floating action bar for bulk delete */}
+      {user.role === 'SUPERADMIN' && (
+        <div className={`${styles.floatingBar} ${selectedIds.size > 0 ? styles.floatingBarActive : ''}`}>
+          <div className={styles.floatingBarInfo}>
+            <span className={styles.floatingBarCount}>{selectedIds.size}</span>
+            <span>Transaksi terpilih</span>
+          </div>
+          <button
+            type="button"
+            className={styles.floatingBarBtn}
+            onClick={() => setBulkModalOpen(true)}
+          >
+            <Trash2 size={16} />
+            <span>Hapus Terpilih</span>
+          </button>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkModalOpen && (
+        <div 
+          className={stylesModal.backdrop} 
+          onClick={() => {
+            if (!bulkDeleting) {
+              setBulkModalOpen(false);
+              setConfirmText('');
+              setBulkDeleteError(null);
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div 
+            className={stylesModal.modal} 
+            style={{ maxWidth: '500px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={stylesModal.header}>
+              <h3>Konfirmasi Hapus Masal</h3>
+              <button 
+                type="button" 
+                className={stylesModal.closeBtn}
+                onClick={() => {
+                  setBulkModalOpen(false);
+                  setConfirmText('');
+                  setBulkDeleteError(null);
+                }}
+                disabled={bulkDeleting}
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+
+            <div className={stylesModal.body}>
+              <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text)' }}>
+                Anda akan menghapus secara permanen <strong>{selectedIds.size} transaksi</strong> berikut ini:
+              </p>
+
+              <div style={{ 
+                maxHeight: '180px', 
+                overflowY: 'auto', 
+                border: '1px solid var(--color-border)', 
+                borderRadius: 'var(--radius-lg)', 
+                padding: 'var(--space-3)', 
+                backgroundColor: 'var(--color-bg)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--space-2)',
+                marginTop: 'var(--space-2)'
+              }}>
+                {transactions
+                  .filter(tx => selectedIds.has(tx.id))
+                  .map(tx => (
+                    <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', borderBottom: '1px solid var(--color-border)', paddingBottom: '6px', paddingTop: '2px' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--color-text)', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {tx.description}
+                      </span>
+                      <span style={{ color: 'var(--color-danger)', fontWeight: 700 }}>
+                        {formatRupiah(tx.totalAmount)}
+                      </span>
+                    </div>
+                  ))
+                }
+              </div>
+
+              <p style={{ margin: 'var(--space-2) 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                Tindakan ini tidak dapat dibatalkan. Log audit permanen akan dicatat untuk aktivitas ini.
+              </p>
+
+              <div style={{ marginTop: 'var(--space-2)' }}>
+                <label htmlFor="confirm-typing" style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                  Ketik "HAPUS" untuk menyetujui penghapusan
+                </label>
+                <input
+                  id="confirm-typing"
+                  type="text"
+                  className={styles.confirmationInput}
+                  placeholder="Ketik HAPUS di sini..."
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  disabled={bulkDeleting}
+                  autoComplete="off"
+                />
+              </div>
+
+              {bulkDeleteError && (
+                <div style={{ color: 'var(--color-danger)', fontSize: 'var(--text-xs)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                  <XCircle size={14} />
+                  <span>{bulkDeleteError}</span>
+                </div>
+              )}
+            </div>
+
+            <div className={stylesModal.footer}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setBulkModalOpen(false);
+                  setConfirmText('');
+                  setBulkDeleteError(null);
+                }}
+                disabled={bulkDeleting}
+                style={{ minHeight: '38px' }}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleBulkDelete}
+                disabled={confirmText !== 'HAPUS' || bulkDeleting}
+                style={{ 
+                  minHeight: '38px', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: 'var(--space-2)',
+                  backgroundColor: confirmText === 'HAPUS' ? 'var(--color-danger)' : 'var(--color-border)',
+                  color: confirmText === 'HAPUS' ? 'white' : 'var(--color-text-muted)',
+                  cursor: confirmText === 'HAPUS' ? 'pointer' : 'not-allowed'
+                }}
+              >
+                {bulkDeleting && <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />}
+                <span>Hapus Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
