@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/actions/auth';
 import type { ApiResponse } from '@/types';
 import { Prisma, PaymentMethod, Location } from '@prisma/client';
 import type { OngoingPayment, Category, SubCategory, Branch } from '@prisma/client';
+import { createAuditLog } from '@/lib/actions/audit';
 
 // ============================================================
 // Types
@@ -421,5 +422,167 @@ export async function realizeOngoingPayment(
       success: false, 
       error: error instanceof Error ? error.message : 'Gagal merealisasikan pembayaran.' 
     };
+  }
+}
+
+/**
+ * Update an existing ongoing payment request (Only BELUM_DIBAYAR or SUDAH_DIBAYAR can be edited).
+ */
+export async function updateOngoingPayment(
+  id: number,
+  data: {
+    branchId?: number;
+    categoryId: number;
+    subCategoryId?: number;
+    description: string;
+    amountNeeded: number;
+    initialReceiptPath?: string;
+    requestDate?: string;
+    frequency?: string;
+    location?: Location;
+    notes?: string;
+  }
+): Promise<ApiResponse<void>> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return { success: false, error: 'Sesi Anda telah berakhir. Silakan masuk kembali.' };
+    }
+
+    if (user.role !== 'SUPERADMIN' && user.role !== 'ADMIN') {
+      return { success: false, error: 'Akses ditolak. Anda tidak memiliki izin untuk fitur ini.' };
+    }
+
+    // Fetch existing ongoing payment
+    const payment = await prisma.ongoingPayment.findUnique({
+      where: { id },
+    });
+
+    if (!payment) {
+      return { success: false, error: 'Data pembayaran berjalan tidak ditemukan.' };
+    }
+
+    // Role-based access control (Poka-Yoke)
+    if (user.role === 'ADMIN' && payment.branchId !== user.branchId) {
+      return { success: false, error: 'Akses ditolak. Anda hanya diizinkan untuk mengelola cabang Anda sendiri.' };
+    }
+
+    // State control: cannot edit if realized
+    if (payment.status === 'TER_REALISASI') {
+      return { success: false, error: 'Akses ditolak. Pembayaran berjalan yang sudah terealisasi tidak dapat diubah.' };
+    }
+
+    let targetBranchId = payment.branchId;
+    if (user.role === 'SUPERADMIN') {
+      if (!data.branchId) {
+        return { success: false, error: 'Mohon tentukan cabang untuk request ini.' };
+      }
+      targetBranchId = data.branchId;
+    }
+
+    if (!data.categoryId || !data.description.trim() || data.amountNeeded <= 0) {
+      return { success: false, error: 'Mohon isi semua bidang wajib dengan benar.' };
+    }
+
+    // Input length validation (Finding #10)
+    if (data.description.length > 255) {
+      return { success: false, error: 'Deskripsi request maksimal 255 karakter.' };
+    }
+    if (data.initialReceiptPath && data.initialReceiptPath.length > 500) {
+      return { success: false, error: 'Path berkas bukti awal terlalu panjang.' };
+    }
+    if (data.frequency && data.frequency.length > 20) {
+      return { success: false, error: 'Frekuensi maksimal 20 karakter.' };
+    }
+    if (data.notes && data.notes.length > 2000) {
+      return { success: false, error: 'Catatan tambahan maksimal 2000 karakter.' };
+    }
+
+    await prisma.ongoingPayment.update({
+      where: { id },
+      data: {
+        branchId: targetBranchId,
+        categoryId: Number(data.categoryId),
+        subCategoryId: data.subCategoryId ? Number(data.subCategoryId) : null,
+        description: data.description.trim(),
+        amountNeeded: new Prisma.Decimal(data.amountNeeded),
+        initialReceiptPath: data.initialReceiptPath || null,
+        requestDate: data.requestDate ? new Date(data.requestDate) : new Date(),
+        frequency: data.frequency || null,
+        location: data.location || null,
+        notes: data.notes?.trim() || null,
+      },
+    });
+
+    await createAuditLog({
+      userId: user.id,
+      actionType: 'UPDATE',
+      targetTable: 'OngoingPayment',
+      targetId: String(id),
+      description: `Mengubah request pembayaran berjalan ID ${id}: "${data.description.trim()}" senilai Rp ${Number(data.amountNeeded).toLocaleString('id-ID')}`,
+    });
+
+    revalidatePath('/dashboard');
+    revalidatePath('/ongoing/list');
+
+    return { success: true, message: 'Request pembayaran berhasil diperbarui.' };
+  } catch (error) {
+    console.error('Error updating ongoing payment:', error);
+    return { success: false, error: 'Gagal memperbarui request pembayaran.' };
+  }
+}
+
+/**
+ * Delete / cancel an existing ongoing payment request (Only BELUM_DIBAYAR or SUDAH_DIBAYAR can be deleted).
+ */
+export async function deleteOngoingPayment(id: number): Promise<ApiResponse<void>> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return { success: false, error: 'Sesi Anda telah berakhir. Silakan masuk kembali.' };
+    }
+
+    if (user.role !== 'SUPERADMIN' && user.role !== 'ADMIN') {
+      return { success: false, error: 'Akses ditolak. Anda tidak memiliki izin untuk fitur ini.' };
+    }
+
+    // Fetch existing ongoing payment
+    const payment = await prisma.ongoingPayment.findUnique({
+      where: { id },
+    });
+
+    if (!payment) {
+      return { success: false, error: 'Data pembayaran berjalan tidak ditemukan.' };
+    }
+
+    // Role-based access control (Poka-Yoke)
+    if (user.role === 'ADMIN' && payment.branchId !== user.branchId) {
+      return { success: false, error: 'Akses ditolak. Anda hanya diizinkan untuk mengelola cabang Anda sendiri.' };
+    }
+
+    // State control: cannot delete if realized
+    if (payment.status === 'TER_REALISASI') {
+      return { success: false, error: 'Akses ditolak. Pembayaran berjalan yang sudah terealisasi tidak dapat dihapus.' };
+    }
+
+    await prisma.ongoingPayment.delete({
+      where: { id },
+    });
+
+    await createAuditLog({
+      userId: user.id,
+      actionType: 'DELETE',
+      targetTable: 'OngoingPayment',
+      targetId: String(id),
+      description: `Menghapus request pembayaran berjalan ID ${id}: "${payment.description}" senilai Rp ${Number(payment.amountNeeded).toLocaleString('id-ID')}`,
+    });
+
+    revalidatePath('/dashboard');
+    revalidatePath('/ongoing/list');
+
+    return { success: true, message: 'Request pembayaran berhasil dihapus.' };
+  } catch (error) {
+    console.error('Error deleting ongoing payment:', error);
+    return { success: false, error: 'Gagal menghapus request pembayaran.' };
   }
 }

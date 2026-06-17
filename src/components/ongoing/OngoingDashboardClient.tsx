@@ -9,26 +9,31 @@ import {
   Tag, 
   ChevronLeft,
   ChevronRight,
-  Loader2
+  Loader2,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import { formatRupiah } from '@/lib/formatters';
 import type { AuthUser } from '@/types';
-import type { Category, Branch } from '@prisma/client';
+import type { Branch } from '@prisma/client';
+import type { CategoryWithSub } from '@/lib/actions/categories';
 import { 
   getOngoingPayments, 
   updateOngoingStatusToPaid, 
+  deleteOngoingPayment,
   OngoingPaymentWithRelations 
 } from '@/lib/actions/ongoing';
 import { getTransactionById, TransactionWithRelations } from '@/lib/actions/transactions';
 import Link from 'next/link';
 import OngoingRealizeModal from '@/components/modals/OngoingRealizeModal';
+import OngoingEditModal from '@/components/modals/OngoingEditModal';
 import TransactionDetailModal from '@/components/modals/TransactionDetailModal';
 import ConfirmModal from '@/components/modals/ConfirmModal';
 import styles from '@/app/(dashboard)/ongoing/list/page.module.css';
 
 interface OngoingDashboardClientProps {
   user: AuthUser;
-  categories: Category[];
+  categories: CategoryWithSub[];
   branches: Branch[];
 }
 
@@ -66,6 +71,14 @@ export default function OngoingDashboardClient({
   // Confirmation modal state
   const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
   const [payTargetId, setPayTargetId] = useState<number | null>(null);
+
+  // Edit modal states
+  const [isEditOpen, setIsEditOpen] = useState<boolean>(false);
+  const [editTargetPayment, setEditTargetPayment] = useState<OngoingPaymentWithRelations | null>(null);
+
+  // Delete modal states
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState<boolean>(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
   // Fetch payments based on filters and tab
   const fetchPayments = useCallback(async () => {
@@ -138,6 +151,40 @@ export default function OngoingDashboardClient({
       description: payment.description,
     });
     setIsRealizeOpen(true);
+  };
+
+  // Trigger Edit Modal
+  const handleEditClick = (payment: OngoingPaymentWithRelations) => {
+    setEditTargetPayment(payment);
+    setIsEditOpen(true);
+  };
+
+  // Open Delete Confirmation Modal
+  const handleDeleteClick = (id: number) => {
+    setDeleteTargetId(id);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  // Perform delete upon confirmation
+  const handleConfirmDelete = () => {
+    if (deleteTargetId === null) return;
+
+    startTransition(async () => {
+      try {
+        const res = await deleteOngoingPayment(deleteTargetId);
+        if (res.success) {
+          fetchPayments();
+        } else {
+          alert(res.error || 'Gagal menghapus request pembayaran.');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Terjadi kesalahan koneksi saat menghapus request pembayaran.');
+      } finally {
+        setIsDeleteConfirmOpen(false);
+        setDeleteTargetId(null);
+      }
+    });
   };
 
   // Open Transaction Detail Modal
@@ -295,8 +342,31 @@ export default function OngoingDashboardClient({
                       </a>
                     )}
 
+                    {/* Edit button */}
+                    <button
+                      type="button"
+                      onClick={() => handleEditClick(p)}
+                      className={styles.attachmentLink}
+                      style={{ cursor: 'pointer' }}
+                      title="Ubah Request Pembayaran"
+                    >
+                      <Edit2 size={18} style={{ color: 'var(--color-primary)' }} />
+                    </button>
+
+                    {/* Delete button */}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteClick(p.id)}
+                      className={styles.attachmentLink}
+                      style={{ cursor: 'pointer' }}
+                      title="Hapus Request Pembayaran"
+                    >
+                      <Trash2 size={18} style={{ color: 'var(--color-danger)' }} />
+                    </button>
+
                     {isUnpaid ? (
                       <button
+                        type="button"
                         onClick={() => handlePayClick(p.id)}
                         disabled={isPending}
                         className={`${styles.actionBtn} ${styles.btnPay}`}
@@ -308,6 +378,7 @@ export default function OngoingDashboardClient({
                       </button>
                     ) : isPaid ? (
                       <button
+                        type="button"
                         onClick={() => handleRealizeClick(p)}
                         className={`${styles.actionBtn} ${styles.btnRealize}`}
                       >
@@ -393,6 +464,39 @@ export default function OngoingDashboardClient({
           setIsTxDetailOpen(false);
           setSelectedTx(null);
         }}
+      />
+
+      {/* Edit Modal */}
+      {isEditOpen && editTargetPayment && (
+        <OngoingEditModal
+          isOpen={isEditOpen}
+          onClose={() => {
+            setIsEditOpen(false);
+            setEditTargetPayment(null);
+          }}
+          onUpdateSuccess={() => {
+            fetchPayments();
+          }}
+          user={user}
+          categories={categories}
+          branches={branches}
+          payment={editTargetPayment}
+        />
+      )}
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => {
+          setIsDeleteConfirmOpen(false);
+          setDeleteTargetId(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Hapus Request Pembayaran"
+        message="Apakah Anda yakin ingin menghapus request pembayaran berjalan ini secara permanen? Tindakan ini tidak dapat dibatalkan."
+        confirmText="Ya, Hapus"
+        cancelText="Batal"
+        isPending={isPending}
       />
     </div>
   );
