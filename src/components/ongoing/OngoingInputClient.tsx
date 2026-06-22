@@ -10,7 +10,8 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowRight,
-  PlusCircle
+  PlusCircle,
+  Store
 } from 'lucide-react';
 import { createOngoingPayment } from '@/lib/actions/ongoing';
 import type { AuthUser } from '@/types';
@@ -61,6 +62,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
     return `${year}-${month}-${day}`;
   });
   const [frequency, setFrequency] = useState<string>('');
+  const [vendor, setVendor] = useState<string>('');
 
   // File upload states
   const [uploading, setUploading] = useState<boolean>(false);
@@ -181,6 +183,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
           frequency: frequency || undefined,
           location: location ? (location as Location) : undefined,
           notes: notes.trim() || undefined,
+          vendor: vendor.trim() || undefined,
         });
 
         if (res.success) {
@@ -207,6 +210,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
     setFrequency('');
     setLocation('');
     setNotes('');
+    setVendor('');
     handleRemoveReceipt();
   };
 
@@ -350,6 +354,34 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
                 <option value="MESS">Mess</option>
                 <option value="OFFICE">Office</option>
               </select>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="vendor" className={styles.label}>Vendor / Nama Toko (Opsional)</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="vendor"
+                  type="text"
+                  className={styles.input}
+                  style={{ paddingLeft: 'var(--space-10)' }}
+                  placeholder="Contoh: Toko Cat Sumber Harapan"
+                  value={vendor}
+                  onChange={(e) => setVendor(e.target.value)}
+                  disabled={isPending}
+                />
+                <span style={{
+                  position: 'absolute',
+                  left: 'var(--space-4)',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  pointerEvents: 'none',
+                  color: 'var(--color-text-muted)'
+                }}>
+                  <Store size={16} />
+                </span>
+              </div>
             </div>
 
             <div className={`${styles.formGroup} ${styles.fullWidth}`}>

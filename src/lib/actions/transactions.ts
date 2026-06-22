@@ -120,7 +120,7 @@ export async function createTransaction(
     // total = (qty × price) - (discountPerUnit × qty) - discountTotal + taxAmount
     const qty = new Prisma.Decimal(quantity);
     const price = new Prisma.Decimal(pricePerUnit);
-    let totalAmount = qty.mul(price);
+    let totalAmount = data.totalAmount !== undefined ? new Prisma.Decimal(data.totalAmount) : qty.mul(price);
     const discountPerUnitDecimal = discountPerUnit ? new Prisma.Decimal(discountPerUnit) : null;
     const discountTotalDecimal = discountTotal ? new Prisma.Decimal(discountTotal) : null;
     const taxAmountDecimal = taxAmount ? new Prisma.Decimal(taxAmount) : null;
@@ -193,7 +193,7 @@ export async function createTransaction(
               totalAmount,
               paymentMethod,
               location: location || ongoingPayment.location || null,
-              vendor: vendor?.trim() || null,
+              vendor: vendor?.trim() || ongoingPayment.vendor || null,
               receiptPath: receiptPath || null,
               notes: notes?.trim() || null,
               customFields: customFields ? (customFields as Prisma.InputJsonValue) : Prisma.DbNull,

@@ -60,6 +60,7 @@ export interface TransactionFormData {
   quantity: number;
   unit: string;
   pricePerUnit: number;
+  totalAmount?: number;
   // Price breakdown fields (all optional — null/undefined = not applicable)
   discountPerUnit?: number;
   discountTotal?: number;

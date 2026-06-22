@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useTransition, useEffect } from 'react';
-import { X, UploadCloud, AlertCircle, FileText, CheckCircle2, Loader2, Save } from 'lucide-react';
+import { X, UploadCloud, AlertCircle, FileText, CheckCircle2, Loader2, Save, Store } from 'lucide-react';
 import { updateOngoingPayment } from '@/lib/actions/ongoing';
 import type { AuthUser } from '@/types';
 import type { Branch, Location } from '@prisma/client';
@@ -57,6 +57,7 @@ export default function OngoingEditModal({
     return `${year}-${month}-${day}`;
   });
   const [frequency, setFrequency] = useState<string>(payment.frequency || '');
+  const [vendor, setVendor] = useState<string>(payment.vendor || '');
 
   // File upload states
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -176,6 +177,7 @@ export default function OngoingEditModal({
           frequency: frequency || undefined,
           location: location ? (location as Location) : undefined,
           notes: notes.trim() || undefined,
+          vendor: vendor.trim() || undefined,
         });
 
         if (res.success) {
@@ -231,16 +233,16 @@ export default function OngoingEditModal({
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {/* Row 1: Branch and Request Date */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-                        Cabang <span style={{ color: 'var(--color-danger)' }}>*</span>
+                  <div className={styles.grid}>
+                    <div className={styles.formGroup}>
+                      <label className={`${styles.formLabel} ${styles.labelRequired}`}>
+                        Cabang
                       </label>
                       <select
                         value={branchId}
                         onChange={(e) => setBranchId(e.target.value)}
                         disabled={user.role === 'ADMIN'}
-                        style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: user.role === 'ADMIN' ? 'var(--color-bg)' : 'var(--color-surface)', color: 'var(--color-text)', cursor: user.role === 'ADMIN' ? 'not-allowed' : 'pointer' }}
+                        className={styles.input}
                       >
                         <option value="">-- Pilih Cabang --</option>
                         {branches.map((b) => (
@@ -251,30 +253,30 @@ export default function OngoingEditModal({
                       </select>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-                        Tanggal Pengajuan <span style={{ color: 'var(--color-danger)' }}>*</span>
+                    <div className={styles.formGroup}>
+                      <label className={`${styles.formLabel} ${styles.labelRequired}`}>
+                        Tanggal Pengajuan
                       </label>
                       <input
                         type="date"
                         value={requestDate}
                         onChange={(e) => setRequestDate(e.target.value)}
                         required
-                        style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', fontFamily: 'var(--font-body)' }}
+                        className={styles.input}
                       />
                     </div>
                   </div>
 
                   {/* Row 2: Category and Subcategory */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-                        Kategori Pengeluaran <span style={{ color: 'var(--color-danger)' }}>*</span>
+                  <div className={styles.grid}>
+                    <div className={styles.formGroup}>
+                      <label className={`${styles.formLabel} ${styles.labelRequired}`}>
+                        Kategori Pengeluaran
                       </label>
                       <select
                         value={categoryId}
                         onChange={(e) => handleCategoryChange(e.target.value)}
-                        style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', cursor: 'pointer' }}
+                        className={styles.input}
                       >
                         <option value="">-- Pilih Kategori --</option>
                         {categories.map((c) => (
@@ -285,15 +287,15 @@ export default function OngoingEditModal({
                       </select>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>
                         Sub-Kategori
                       </label>
                       <select
                         value={subCategoryId}
                         onChange={(e) => setSubCategoryId(e.target.value)}
                         disabled={!isMounted || !categoryId || subCategories.length === 0}
-                        style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: (!categoryId || subCategories.length === 0) ? 'var(--color-bg)' : 'var(--color-surface)', color: 'var(--color-text)', cursor: 'pointer' }}
+                        className={styles.input}
                       >
                         <option value="">
                           {!categoryId
@@ -312,15 +314,15 @@ export default function OngoingEditModal({
                   </div>
 
                   {/* Row 3: Frequency and Location */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                  <div className={styles.grid}>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>
                         Frekuensi
                       </label>
                       <select
                         value={frequency}
                         onChange={(e) => setFrequency(e.target.value)}
-                        style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', cursor: 'pointer' }}
+                        className={styles.input}
                       >
                         <option value="">One-Time (Sekali Bayar)</option>
                         <option value="Mingguan">Mingguan</option>
@@ -329,14 +331,14 @@ export default function OngoingEditModal({
                       </select>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>
                         Lokasi
                       </label>
                       <select
                         value={location}
                         onChange={(e) => setLocation(e.target.value)}
-                        style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', cursor: 'pointer' }}
+                        className={styles.input}
                       >
                         <option value="">-- Pilih Lokasi --</option>
                         <option value="SITE">Site</option>
@@ -346,40 +348,70 @@ export default function OngoingEditModal({
                     </div>
                   </div>
 
+                  {/* Vendor Input */}
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
+                      Vendor / Nama Toko (Opsional)
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Toko Cat Sumber Harapan"
+                        value={vendor}
+                        onChange={(e) => setVendor(e.target.value)}
+                        className={styles.input}
+                        style={{ paddingLeft: '38px' }}
+                      />
+                      <span style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        pointerEvents: 'none',
+                        color: 'var(--color-text-muted)'
+                      }}>
+                        <Store size={16} />
+                      </span>
+                    </div>
+                  </div>
+
                   {/* Description Input */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-                      Deskripsi Keperluan <span style={{ color: 'var(--color-danger)' }}>*</span>
+                  <div className={styles.formGroup}>
+                    <label className={`${styles.formLabel} ${styles.labelRequired}`}>
+                      Deskripsi Keperluan
                     </label>
                     <input
                       type="text"
                       placeholder="Contoh: Panjar pembelian cat tembok renovasi depan"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }}
+                      className={styles.input}
                     />
                   </div>
 
                   {/* Amount Needed Input */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-                      Estimasi Dana Dibutuhkan (Rp) <span style={{ color: 'var(--color-danger)' }}>*</span>
+                  <div className={styles.formGroup}>
+                    <label className={`${styles.formLabel} ${styles.labelRequired}`}>
+                      Estimasi Dana Dibutuhkan
                     </label>
                     <div style={{ position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: '14px', top: '10px', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', fontWeight: 600 }}>Rp</span>
+                      <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', fontWeight: 600 }}>Rp</span>
                       <input
                         type="text"
                         placeholder="0"
                         value={amountNeeded}
                         onChange={(e) => handleAmountChange(e.target.value)}
-                        style={{ width: '100%', padding: '10px 14px 10px 38px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', fontWeight: 600 }}
+                        className={styles.input}
+                        style={{ paddingLeft: '34px', fontWeight: 600 }}
                       />
                     </div>
                   </div>
 
                   {/* Notes Area */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                       Catatan Tambahan
                     </label>
                     <textarea
@@ -387,7 +419,7 @@ export default function OngoingEditModal({
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       rows={2}
-                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', fontFamily: 'var(--font-body)', resize: 'vertical' }}
+                      className={`${styles.input} ${styles.textarea}`}
                     />
                   </div>
 

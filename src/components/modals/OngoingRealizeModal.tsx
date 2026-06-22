@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useTransition } from 'react';
-import { X, UploadCloud, AlertCircle, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { X, UploadCloud, AlertCircle, FileText, CheckCircle2, AlertTriangle, Store } from 'lucide-react';
 import { realizeOngoingPayment } from '@/lib/actions/ongoing';
 import { formatRupiah } from '@/lib/formatters';
 import type { PaymentMethod } from '@prisma/client';
@@ -14,6 +14,7 @@ interface OngoingRealizeModalProps {
   paymentId: number;
   estimatedAmount: number;
   description: string;
+  defaultVendor?: string;
 }
 
 export default function OngoingRealizeModal({
@@ -23,6 +24,7 @@ export default function OngoingRealizeModal({
   paymentId,
   estimatedAmount,
   description,
+  defaultVendor,
 }: OngoingRealizeModalProps) {
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,7 +33,7 @@ export default function OngoingRealizeModal({
   const [isMoneyEnough, setIsMoneyEnough] = useState<boolean>(true);
   const [actualAmount, setActualAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
-  const [vendor, setVendor] = useState<string>('');
+  const [vendor, setVendor] = useState<string>(defaultVendor || '');
   const [notes, setNotes] = useState<string>('');
   const [beritaAcara, setBeritaAcara] = useState<string>('');
   const [receiptPath, setReceiptPath] = useState<string>('');
@@ -228,22 +230,22 @@ export default function OngoingRealizeModal({
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {/* Realization Date Input */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-                      Tanggal Realisasi Belanja <span style={{ color: 'var(--color-danger)' }}>*</span>
+                  <div className={styles.formGroup}>
+                    <label className={`${styles.formLabel} ${styles.labelRequired}`}>
+                      Tanggal Realisasi Belanja
                     </label>
                     <input
                       type="date"
                       value={transactionDate}
                       onChange={(e) => setTransactionDate(e.target.value)}
                       required
-                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', fontFamily: 'var(--font-body)' }}
+                      className={styles.input}
                     />
                   </div>
 
                   {/* Nomor Berita Acara Input */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                       Nomor Berita Acara (Opsional)
                     </label>
                     <input
@@ -251,14 +253,14 @@ export default function OngoingRealizeModal({
                       placeholder="Contoh: 0001/BA-GA/HO/V/2026"
                       value={beritaAcara}
                       onChange={(e) => setBeritaAcara(e.target.value)}
-                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }}
+                      className={styles.input}
                     />
                   </div>
 
                   {/* Budget Sufficiency Toggle */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-                      Apakah uang estimasi awal cukup? <span style={{ color: 'var(--color-danger)' }}>*</span>
+                  <div className={styles.formGroup}>
+                    <label className={`${styles.formLabel} ${styles.labelRequired}`}>
+                      Apakah uang estimasi awal cukup?
                     </label>
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <button
@@ -279,18 +281,19 @@ export default function OngoingRealizeModal({
                   </div>
 
                   {/* Realized Spent Cost */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-                      Total Uang Realisasi yang Dibelanjakan (Rp) <span style={{ color: 'var(--color-danger)' }}>*</span>
+                  <div className={styles.formGroup}>
+                    <label className={`${styles.formLabel} ${styles.labelRequired}`}>
+                      Total Uang Realisasi yang Dibelanjakan
                     </label>
                     <div style={{ position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: '14px', top: '10px', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', fontWeight: 600 }}>Rp</span>
+                      <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', fontWeight: 600 }}>Rp</span>
                       <input
                         type="text"
                         placeholder="0"
                         value={actualAmount}
                         onChange={(e) => handleAmountChange(e.target.value)}
-                        style={{ width: '100%', padding: '10px 14px 10px 38px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', fontWeight: 600 }}
+                        className={styles.input}
+                        style={{ paddingLeft: '34px', fontWeight: 600 }}
                       />
                     </div>
                     {/* Variance indicator banner */}
@@ -307,14 +310,14 @@ export default function OngoingRealizeModal({
                   </div>
 
                   {/* Payment Method */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-                      Metode Realisasi <span style={{ color: 'var(--color-danger)' }}>*</span>
+                  <div className={styles.formGroup}>
+                    <label className={`${styles.formLabel} ${styles.labelRequired}`}>
+                      Metode Realisasi
                     </label>
                     <select
                       value={paymentMethod}
                       onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }}
+                      className={styles.input}
                     >
                       <option value="CASH">CASH (Tunai)</option>
                       <option value="TRANSFER">TRANSFER (Non-Tunai)</option>
@@ -323,23 +326,38 @@ export default function OngoingRealizeModal({
                   </div>
 
                   {/* Vendor Input */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>
                       Vendor / Nama Toko (Opsional)
                     </label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: Toko Cat Sumber Harapan"
-                      value={vendor}
-                      onChange={(e) => setVendor(e.target.value)}
-                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }}
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Toko Cat Sumber Harapan"
+                        value={vendor}
+                        onChange={(e) => setVendor(e.target.value)}
+                        className={styles.input}
+                        style={{ paddingLeft: '38px' }}
+                      />
+                      <span style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        pointerEvents: 'none',
+                        color: 'var(--color-text-muted)'
+                      }}>
+                        <Store size={16} />
+                      </span>
+                    </div>
                   </div>
 
                   {/* Notes / Remarks Input */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
-                      Catatan Tambahan <span style={{ color: 'var(--color-danger)' }}>*</span>
+                  <div className={styles.formGroup}>
+                    <label className={`${styles.formLabel} ${styles.labelRequired}`}>
+                      Catatan Tambahan
                     </label>
                     <textarea
                       placeholder="Contoh: Cat tembok 2 pail warna abu-abu muda, nota terlampir."
@@ -347,7 +365,8 @@ export default function OngoingRealizeModal({
                       onChange={(e) => setNotes(e.target.value)}
                       required
                       rows={2}
-                      style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)', resize: 'none' }}
+                      className={`${styles.input} ${styles.textarea}`}
+                      style={{ resize: 'none' }}
                     />
                   </div>
 

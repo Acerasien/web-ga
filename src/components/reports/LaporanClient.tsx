@@ -42,6 +42,7 @@ import { formatRupiah } from '@/lib/formatters';
 import { getReportData, getBranchComparisonData } from '@/lib/actions/reports';
 import type { ReportPayload, ComparisonDataPoint, ComparisonPeriod, CategoryBreakdown } from '@/lib/actions/reports';
 import { getTransactions } from '@/lib/actions/transactions';
+import { getOngoingPayments } from '@/lib/actions/ongoing';
 import { getCategoriesWithSub } from '@/lib/actions/categories';
 import type { CategoryWithSub } from '@/lib/actions/categories';
 import type { Branch } from '@prisma/client';
@@ -346,6 +347,38 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         return;
       }
 
+      // Fetch ongoing payments that are BELUM_DIBAYAR or SUDAH_DIBAYAR (ACTIVE)
+      const ongoingResult = await getOngoingPayments({
+        status: 'ACTIVE',
+        limit: 10000
+      });
+
+      let exportedOngoings: any[] = [];
+      if (ongoingResult.success && ongoingResult.data?.payments) {
+        exportedOngoings = ongoingResult.data.payments;
+        // Filter in-memory by selected months and branchIds
+        if (period !== 'YEARLY' && months.length > 0) {
+          exportedOngoings = exportedOngoings.filter(p => months.includes(new Date(p.requestDate || p.createdAt).getMonth() + 1));
+        }
+        if (branchIds.length > 0) {
+          exportedOngoings = exportedOngoings.filter(p => branchIds.includes(p.branchId));
+        } else if (user.role !== 'SUPERADMIN' && user.branchId) {
+          exportedOngoings = exportedOngoings.filter(p => p.branchId === user.branchId);
+        }
+        // Filter by year in-memory
+        if (period === 'YEARLY') {
+          exportedOngoings = exportedOngoings.filter(p => {
+            const y = new Date(p.requestDate || p.createdAt).getFullYear();
+            return y >= year - 4 && y <= year;
+          });
+        } else {
+          exportedOngoings = exportedOngoings.filter(p => {
+            const y = new Date(p.requestDate || p.createdAt).getFullYear();
+            return y === year;
+          });
+        }
+      }
+
       // Filter in-memory by selected months and branchIds
       let exportedTxs = result.data.transactions;
       if (period !== 'YEARLY' && months.length > 0) {
@@ -357,30 +390,48 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         exportedTxs = exportedTxs.filter(tx => tx.branchId === user.branchId);
       }
 
-      if (exportedTxs.length === 0) {
-        alert('Tidak ada transaksi terekam untuk kriteria filter ini.');
+      if (exportedTxs.length === 0 && exportedOngoings.length === 0) {
+        alert('Tidak ada data terekam untuk kriteria filter ini.');
         setExporting(false);
         return;
       }
 
       // Format RFC-4180 compliant CSV string (Poka-Yoke: wraps fields in double quotes)
       const headers = ['Tanggal', 'Cabang', 'Kategori', 'Sub-Kategori', 'Lokasi', 'Deskripsi', 'Kuantitas', 'Satuan', 'Harga Satuan', 'Total Biaya', 'Pembayaran', 'Vendor', 'Catatan', 'Pencatat'];
-      const rows = exportedTxs.map(tx => [
-        new Date(tx.transactionDate).toISOString().split('T')[0],
-        tx.branch.code,
-        tx.category.name,
-        tx.subCategory?.name || '',
-        tx.location || '',
-        tx.description.replace(/"/g, '""'),
-        Number(tx.quantity),
-        tx.unit,
-        Number(tx.pricePerUnit),
-        Number(tx.totalAmount),
-        tx.paymentMethod,
-        (tx.vendor || '').replace(/"/g, '""'),
-        (tx.notes || '').replace(/"/g, '""'),
-        tx.user.fullName
-      ]);
+      const rows = [
+        ...exportedTxs.map(tx => [
+          new Date(tx.transactionDate).toISOString().split('T')[0],
+          tx.branch.code,
+          tx.category.name,
+          tx.subCategory?.name || '',
+          tx.location || '',
+          tx.description.replace(/"/g, '""'),
+          Number(tx.quantity),
+          tx.unit,
+          Number(tx.pricePerUnit),
+          Number(tx.totalAmount),
+          tx.paymentMethod,
+          (tx.vendor || '').replace(/"/g, '""'),
+          (tx.notes || '').replace(/"/g, '""'),
+          tx.user.fullName
+        ]),
+        ...exportedOngoings.map(p => [
+          new Date(p.requestDate || p.createdAt).toISOString().split('T')[0],
+          p.branch.code,
+          p.category.name,
+          p.subCategory?.name || '',
+          p.location || '',
+          `[BELUM REALISASI] ${p.description}`.replace(/"/g, '""'),
+          1,
+          'Transaksi',
+          Number(p.amountNeeded),
+          Number(p.amountNeeded),
+          p.status === 'SUDAH_DIBAYAR' ? 'SUDAH DIBAYAR' : 'BELUM DIBAYAR',
+          (p.vendor || '').replace(/"/g, '""'),
+          (p.notes || '').replace(/"/g, '""'),
+          p.user.fullName
+        ])
+      ];
 
       const csvContent = [
         headers.join(','),
@@ -442,6 +493,38 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         return;
       }
 
+      // Fetch ongoing payments that are BELUM_DIBAYAR or SUDAH_DIBAYAR (ACTIVE)
+      const ongoingResult = await getOngoingPayments({
+        status: 'ACTIVE',
+        limit: 10000
+      });
+
+      let exportedOngoings: any[] = [];
+      if (ongoingResult.success && ongoingResult.data?.payments) {
+        exportedOngoings = ongoingResult.data.payments;
+        // Filter in-memory by selected months and branchIds
+        if (period !== 'YEARLY' && months.length > 0) {
+          exportedOngoings = exportedOngoings.filter(p => months.includes(new Date(p.requestDate || p.createdAt).getMonth() + 1));
+        }
+        if (branchIds.length > 0) {
+          exportedOngoings = exportedOngoings.filter(p => branchIds.includes(p.branchId));
+        } else if (user.role !== 'SUPERADMIN' && user.branchId) {
+          exportedOngoings = exportedOngoings.filter(p => p.branchId === user.branchId);
+        }
+        // Filter by year in-memory
+        if (period === 'YEARLY') {
+          exportedOngoings = exportedOngoings.filter(p => {
+            const y = new Date(p.requestDate || p.createdAt).getFullYear();
+            return y >= year - 4 && y <= year;
+          });
+        } else {
+          exportedOngoings = exportedOngoings.filter(p => {
+            const y = new Date(p.requestDate || p.createdAt).getFullYear();
+            return y === year;
+          });
+        }
+      }
+
       // Filter in-memory by selected months and branchIds
       let exportedTxs = result.data.transactions;
       if (period !== 'YEARLY' && months.length > 0) {
@@ -453,8 +536,8 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         exportedTxs = exportedTxs.filter(tx => tx.branchId === user.branchId);
       }
 
-      if (exportedTxs.length === 0) {
-        alert('Tidak ada transaksi terekam untuk kriteria filter ini.');
+      if (exportedTxs.length === 0 && exportedOngoings.length === 0) {
+        alert('Tidak ada data terekam untuk kriteria filter ini.');
         setExporting(false);
         return;
       }
@@ -477,22 +560,40 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         'Pencatat'
       ];
       
-      const rows = exportedTxs.map(tx => [
-        new Date(tx.transactionDate).toLocaleDateString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit' }),
-        `${tx.branch.name} (${tx.branch.code})`,
-        tx.category.name,
-        tx.subCategory?.name || '',
-        tx.location || '',
-        tx.description,
-        Number(tx.quantity),
-        tx.unit,
-        Number(tx.pricePerUnit),
-        Number(tx.totalAmount),
-        tx.paymentMethod === 'PETTY_CASH' ? 'Kas Kecil' : tx.paymentMethod === 'TRANSFER' ? 'Transfer Bank' : 'Tunai',
-        tx.vendor || '',
-        tx.notes || '',
-        tx.user.fullName
-      ]);
+      const rows = [
+        ...exportedTxs.map(tx => [
+          new Date(tx.transactionDate).toLocaleDateString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+          `${tx.branch.name} (${tx.branch.code})`,
+          tx.category.name,
+          tx.subCategory?.name || '',
+          tx.location || '',
+          tx.description,
+          Number(tx.quantity),
+          tx.unit,
+          Number(tx.pricePerUnit),
+          Number(tx.totalAmount),
+          tx.paymentMethod === 'PETTY_CASH' ? 'Kas Kecil' : tx.paymentMethod === 'TRANSFER' ? 'Transfer Bank' : 'Tunai',
+          tx.vendor || '',
+          tx.notes || '',
+          tx.user.fullName
+        ]),
+        ...exportedOngoings.map(p => [
+          new Date(p.requestDate || p.createdAt).toLocaleDateString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+          `${p.branch.name} (${p.branch.code})`,
+          p.category.name,
+          p.subCategory?.name || '',
+          p.location || '',
+          `[BELUM REALISASI] ${p.description}`,
+          1,
+          'Transaksi',
+          Number(p.amountNeeded),
+          Number(p.amountNeeded),
+          p.status === 'SUDAH_DIBAYAR' ? 'SUDAH DIBAYAR' : 'BELUM DIBAYAR',
+          p.vendor || '',
+          p.notes || '',
+          p.user.fullName
+        ])
+      ];
 
       // 2. Build SheetJS Workbook & Worksheet
       const wsData = [headers, ...rows];

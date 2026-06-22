@@ -200,8 +200,15 @@ export default function OngoingHistoryClient({
                       <td className={styles.td}>
                         {p.category.name}
                       </td>
-                      <td className={styles.td} style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.description}>
-                        {p.description}
+                      <td className={styles.td} style={{ maxWidth: '200px' }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.description}>
+                          {p.description}
+                        </div>
+                        {p.vendor && (
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px', fontWeight: 600 }}>
+                            Vendor: {p.vendor}
+                          </div>
+                        )}
                       </td>
                       <td className={styles.td} style={{ textAlign: 'right', fontWeight: 600 }}>
                         {formatRupiah(est)}

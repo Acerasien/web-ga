@@ -170,6 +170,7 @@ export async function createOngoingPayment(data: {
   frequency?: string;
   location?: Location;
   notes?: string;
+  vendor?: string;
 }): Promise<ApiResponse<void>> {
   try {
     const user = await getCurrentUser();
@@ -211,6 +212,9 @@ export async function createOngoingPayment(data: {
     if (data.notes && data.notes.length > 2000) {
       return { success: false, error: 'Catatan tambahan maksimal 2000 karakter.' };
     }
+    if (data.vendor && data.vendor.length > 100) {
+      return { success: false, error: 'Vendor maksimal 100 karakter.' };
+    }
 
     await prisma.ongoingPayment.create({
       data: {
@@ -226,6 +230,7 @@ export async function createOngoingPayment(data: {
         frequency: data.frequency || null,
         location: data.location || null,
         notes: data.notes?.trim() || null,
+        vendor: data.vendor?.trim() || null,
       },
     });
 
@@ -390,7 +395,7 @@ export async function realizeOngoingPayment(
           pricePerUnit: new Prisma.Decimal(data.actualAmount),
           totalAmount: new Prisma.Decimal(data.actualAmount),
           paymentMethod: data.paymentMethod,
-          vendor: data.vendor?.trim() || null,
+          vendor: data.vendor?.trim() || payment.vendor || null,
           receiptPath: data.finalReceiptPath,
           notes: data.notes?.trim() || null,
           beritaAcara: finalBeritaAcara,
@@ -441,6 +446,7 @@ export async function updateOngoingPayment(
     frequency?: string;
     location?: Location;
     notes?: string;
+    vendor?: string;
   }
 ): Promise<ApiResponse<void>> {
   try {
@@ -497,6 +503,9 @@ export async function updateOngoingPayment(
     if (data.notes && data.notes.length > 2000) {
       return { success: false, error: 'Catatan tambahan maksimal 2000 karakter.' };
     }
+    if (data.vendor && data.vendor.length > 100) {
+      return { success: false, error: 'Vendor maksimal 100 karakter.' };
+    }
 
     await prisma.ongoingPayment.update({
       where: { id },
@@ -511,6 +520,7 @@ export async function updateOngoingPayment(
         frequency: data.frequency || null,
         location: data.location || null,
         notes: data.notes?.trim() || null,
+        vendor: data.vendor?.trim() || null,
       },
     });
 

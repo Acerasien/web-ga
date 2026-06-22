@@ -197,6 +197,7 @@ model OngoingPayment {
   frequency          String?        @db.VarChar(20) // e.g. "Monthly", "Yearly", "One-time"
   location           Location?
   notes              String?        @db.Text
+  vendor             String?        @db.VarChar(100)
   // Link to recurring bill template (if this was auto-spawned)
   recurringBillId    Int?           @map("recurring_bill_id")
   requestDate        DateTime       @default(now()) @map("request_date") @db.Date

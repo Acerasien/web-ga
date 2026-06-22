@@ -15,6 +15,8 @@ import {
   ChevronDown,
   ChevronUp,
   Tag,
+  Store,
+  Hash,
 } from 'lucide-react';
 import { createTransaction } from '@/lib/actions/transactions';
 import { formatRupiah } from '@/lib/formatters';
@@ -98,19 +100,46 @@ export default function TransactionForm({ user, categories, branches, initialOng
   const [taxAmountDisplay, setTaxAmountDisplay] = useState<string>('');
   const [taxNote, setTaxNote] = useState<string>('');
 
+  const [isManualTotal, setIsManualTotal] = useState<boolean>(false);
+  const [manualTotal, setManualTotal] = useState<number>(0);
+  const [manualTotalDisplay, setManualTotalDisplay] = useState<string>('');
+
+  const handleToggleManual = (checked: boolean) => {
+    setIsManualTotal(checked);
+    if (checked) {
+      setPricePerUnit(0);
+      setPriceDisplay('');
+      setBreakdownOpen(false);
+      setDiscountPerUnit(0);
+      setDiscountPerUnitDisplay('');
+      setDiscountTotal(0);
+      setDiscountTotalDisplay('');
+      setTaxAmount(0);
+      setTaxAmountDisplay('');
+      setTaxNote('');
+    } else {
+      setManualTotal(0);
+      setManualTotalDisplay('');
+    }
+  };
+
   // Computed totals with live breakdown
   const subtotal = quantity * pricePerUnit;
   const [computedTotal, setComputedTotal] = useState<number>(0);
 
   useEffect(() => {
-    let total = quantity * pricePerUnit;
-    if (breakdownOpen) {
-      total -= discountPerUnit * quantity;
-      total -= discountTotal;
-      total += taxAmount;
+    if (isManualTotal) {
+      setComputedTotal(manualTotal);
+    } else {
+      let total = quantity * pricePerUnit;
+      if (breakdownOpen) {
+        total -= discountPerUnit * quantity;
+        total -= discountTotal;
+        total += taxAmount;
+      }
+      setComputedTotal(Math.max(0, total));
     }
-    setComputedTotal(Math.max(0, total));
-  }, [quantity, pricePerUnit, discountPerUnit, discountTotal, taxAmount, breakdownOpen]);
+  }, [quantity, pricePerUnit, discountPerUnit, discountTotal, taxAmount, breakdownOpen, isManualTotal, manualTotal]);
 
   // Resolve currently selected category and subcategories
   const selectedCategory = categories.find(c => c.id === Number(categoryId));
@@ -191,9 +220,16 @@ export default function TransactionForm({ user, categories, branches, initialOng
       setValidationError('Kuantitas jumlah barang/jasa harus lebih besar dari 0.');
       return;
     }
-    if (pricePerUnit < 0) {
-      setValidationError('Harga satuan tidak boleh bernilai negatif.');
-      return;
+    if (isManualTotal) {
+      if (manualTotal <= 0) {
+        setValidationError('Mohon masukkan total biaya pengeluaran dengan benar.');
+        return;
+      }
+    } else {
+      if (pricePerUnit < 0) {
+        setValidationError('Harga satuan tidak boleh bernilai negatif.');
+        return;
+      }
     }
     if (user.role === 'SUPERADMIN' && !branchId) {
       setValidationError('Tentukan cabang penanggung jawab untuk pengeluaran ini.');
@@ -226,7 +262,8 @@ export default function TransactionForm({ user, categories, branches, initialOng
           description: description.trim(),
           quantity,
           unit: unit.trim(),
-          pricePerUnit,
+          pricePerUnit: isManualTotal ? (manualTotal / quantity) : pricePerUnit,
+          totalAmount: isManualTotal ? manualTotal : undefined,
           // Breakdown fields — only include if the panel was open and values are non-zero
           discountPerUnit: breakdownOpen && discountPerUnit > 0 ? discountPerUnit : undefined,
           discountTotal: breakdownOpen && discountTotal > 0 ? discountTotal : undefined,
@@ -287,6 +324,9 @@ export default function TransactionForm({ user, categories, branches, initialOng
     setTaxAmountDisplay('');
     setTaxNote('');
     handleRemoveReceipt();
+    setIsManualTotal(false);
+    setManualTotal(0);
+    setManualTotalDisplay('');
   };
 
   return (
@@ -352,15 +392,30 @@ export default function TransactionForm({ user, categories, branches, initialOng
               <label htmlFor="beritaAcara" className={styles.label}>
                 Nomor Berita Acara (Opsional)
               </label>
-              <input
-                id="beritaAcara"
-                type="text"
-                className={styles.input}
-                placeholder="Contoh: 0001/BA-GA/HO/V/2026"
-                value={beritaAcara}
-                onChange={(e) => setBeritaAcara(e.target.value)}
-                disabled={isPending}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="beritaAcara"
+                  type="text"
+                  className={styles.input}
+                  style={{ paddingLeft: 'var(--space-10)' }}
+                  placeholder="Contoh: 0001/BA-GA/HO/V/2026"
+                  value={beritaAcara}
+                  onChange={(e) => setBeritaAcara(e.target.value)}
+                  disabled={isPending}
+                />
+                <span style={{
+                  position: 'absolute',
+                  left: 'var(--space-4)',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  pointerEvents: 'none',
+                  color: 'var(--color-text-muted)'
+                }}>
+                  <FileText size={16} />
+                </span>
+              </div>
             </div>
 
             {/* Nomor Invoice (Optional Input) */}
@@ -368,15 +423,30 @@ export default function TransactionForm({ user, categories, branches, initialOng
               <label htmlFor="invoiceNumber" className={styles.label}>
                 Nomor Invoice (Opsional)
               </label>
-              <input
-                id="invoiceNumber"
-                type="text"
-                className={styles.input}
-                placeholder="Contoh: INV/2026/06/1023"
-                value={invoiceNumber}
-                onChange={(e) => setInvoiceNumber(e.target.value)}
-                disabled={isPending}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="invoiceNumber"
+                  type="text"
+                  className={styles.input}
+                  style={{ paddingLeft: 'var(--space-10)' }}
+                  placeholder="Contoh: INV/2026/06/1023"
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                  disabled={isPending}
+                />
+                <span style={{
+                  position: 'absolute',
+                  left: 'var(--space-4)',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  pointerEvents: 'none',
+                  color: 'var(--color-text-muted)'
+                }}>
+                  <Hash size={16} />
+                </span>
+              </div>
             </div>
 
             {/* Date Field */}
@@ -489,6 +559,28 @@ export default function TransactionForm({ user, categories, branches, initialOng
 
           <h3 className={styles.sectionTitle}>Rincian Biaya & Pembayaran</h3>
           <div className={styles.formGrid}>
+            {/* Direct Total Input Toggle */}
+            <div
+              className={styles.switchContainer}
+              onClick={() => !isPending && handleToggleManual(!isManualTotal)}
+            >
+              <label className={styles.switch} onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  id="isManualTotal"
+                  checked={isManualTotal}
+                  onChange={(e) => handleToggleManual(e.target.checked)}
+                  disabled={isPending}
+                />
+                <span className={styles.slider}></span>
+              </label>
+              <label htmlFor="isManualTotal" className={styles.switchLabel} onClick={(e) => e.stopPropagation()}>
+                <span>Input Total Langsung</span>
+                <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }}>
+                  Gunakan jika kuantitas banyak dengan harga satuan yang bervariasi
+                </span>
+              </label>
+            </div>
             {/* Quantity Field */}
             <div className={styles.formGroup}>
               <label htmlFor="quantity" className={`${styles.label} ${styles.labelRequired}`}>
@@ -536,7 +628,7 @@ export default function TransactionForm({ user, categories, branches, initialOng
                   inputMode="numeric"
                   className={styles.input}
                   style={{ paddingLeft: 'var(--space-10)' }}
-                  // placeholder="Contoh: 150.000"
+                  placeholder={isManualTotal ? "-- Dihitung Otomatis --" : "0"}
                   value={priceDisplay}
                   onChange={(e) => {
                     const valueStr = e.target.value;
@@ -548,8 +640,8 @@ export default function TransactionForm({ user, categories, branches, initialOng
                     const formatted = rawDigits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
                     setPriceDisplay(formatted);
                   }}
-                  disabled={isPending}
-                  required
+                  disabled={isPending || isManualTotal}
+                  required={!isManualTotal}
                 />
                 <span style={{
                   position: 'absolute',
@@ -562,6 +654,44 @@ export default function TransactionForm({ user, categories, branches, initialOng
                 }}>Rp</span>
               </div>
             </div>
+
+            {/* Total Biaya Input (Only when isManualTotal is true) */}
+            {isManualTotal && (
+              <div className={styles.formGroup}>
+                <label htmlFor="manualTotal" className={`${styles.label} ${styles.labelRequired}`}>
+                  Total Biaya (Rupiah)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id="manualTotal"
+                    type="text"
+                    inputMode="numeric"
+                    className={styles.input}
+                    style={{ paddingLeft: 'var(--space-10)' }}
+                    placeholder="0"
+                    value={manualTotalDisplay}
+                    onChange={(e) => {
+                      const valueStr = e.target.value;
+                      const rawDigits = valueStr.replace(/[^0-9]/g, '');
+                      const numericValue = rawDigits ? Number(rawDigits) : 0;
+                      setManualTotal(numericValue);
+                      setManualTotalDisplay(rawDigits.replace(/\B(?=(\d{3})+(?!\d))/g, '.'));
+                    }}
+                    disabled={isPending}
+                    required
+                  />
+                  <span style={{
+                    position: 'absolute',
+                    left: 'var(--space-4)',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: 600,
+                    color: 'var(--color-text-muted)'
+                  }}>Rp</span>
+                </div>
+              </div>
+            )}
 
             {/* Payment Method Field */}
             <div className={styles.formGroup}>
@@ -587,15 +717,30 @@ export default function TransactionForm({ user, categories, branches, initialOng
               <label htmlFor="vendor" className={styles.label}>
                 Vendor / Supplier / Toko
               </label>
-              <input
-                id="vendor"
-                type="text"
-                className={styles.input}
-                placeholder="Nama toko atau penerima pembayaran"
-                value={vendor}
-                onChange={(e) => setVendor(e.target.value)}
-                disabled={isPending}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="vendor"
+                  type="text"
+                  className={styles.input}
+                  style={{ paddingLeft: 'var(--space-10)' }}
+                  placeholder="Nama toko atau penerima pembayaran"
+                  value={vendor}
+                  onChange={(e) => setVendor(e.target.value)}
+                  disabled={isPending}
+                />
+                <span style={{
+                  position: 'absolute',
+                  left: 'var(--space-4)',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  pointerEvents: 'none',
+                  color: 'var(--color-text-muted)'
+                }}>
+                  <Store size={16} />
+                </span>
+              </div>
             </div>
 
             {/* Notes Field */}
@@ -643,7 +788,7 @@ export default function TransactionForm({ user, categories, branches, initialOng
               type="button"
               id="breakdown-toggle"
               onClick={() => setBreakdownOpen(o => !o)}
-              disabled={isPending}
+              disabled={isPending || isManualTotal}
               style={{
                 width: '100%',
                 display: 'flex',
@@ -937,7 +1082,9 @@ export default function TransactionForm({ user, categories, branches, initialOng
                 <div className={modalStyles.item}>
                   <span className={modalStyles.label}>Harga Satuan</span>
                   <span className={modalStyles.value}>
-                    {formatRupiah(pricePerUnit)}
+                    {isManualTotal 
+                      ? `${formatRupiah(manualTotal / quantity)} (Rata-rata)` 
+                      : formatRupiah(pricePerUnit)}
                   </span>
                 </div>
 
