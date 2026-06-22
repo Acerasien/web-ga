@@ -112,6 +112,7 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
     const idxQuantity = headers.findIndex(h => h.includes('kuantitas') || h.includes('jumlah') || h.includes('qty') || h.includes('quantity'));
     const idxUnit = headers.findIndex(h => h.includes('satuan') || h.includes('unit'));
     const idxPrice = headers.findIndex(h => h.includes('harga') || h.includes('price'));
+    const idxTotal = headers.findIndex(h => h.includes('total') || h.includes('jumlah biaya') || h.includes('total biaya'));
     const idxPayment = headers.findIndex(h => h.includes('pembayaran') || h.includes('payment') || h.includes('metode'));
     const idxLocation = headers.findIndex(h => h === 'lokasi' || h.includes('location'));
     const idxVendor = headers.findIndex(h => h.includes('vendor') || h.includes('supplier'));
@@ -121,10 +122,10 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
     const idxInvoice = headers.findIndex(h => h.includes('invoice') || h.includes('faktur') || h === 'inv' || h.includes('no_inv'));
 
     // Check mandatory header columns
-    if (idxDate === -1 || idxCategory === -1 || idxDescription === -1 || idxQuantity === -1 || idxUnit === -1 || idxPrice === -1) {
+    if (idxDate === -1 || idxCategory === -1 || idxDescription === -1 || idxQuantity === -1 || idxUnit === -1 || (idxPrice === -1 && idxTotal === -1)) {
       return {
         success: false,
-        error: 'Struktur kolom CSV tidak lengkap. Pastikan memiliki kolom: Tanggal, Kategori, Deskripsi, Kuantitas, Satuan, dan Harga Satuan.',
+        error: 'Struktur kolom CSV tidak lengkap. Pastikan memiliki kolom: Tanggal, Kategori, Deskripsi, Kuantitas, Satuan, dan Harga Satuan atau Total Biaya.',
       };
     }
 
@@ -218,19 +219,37 @@ export async function importTransactions(csvString: string): Promise<ApiResponse
 
         // 5. Quantity & Price metrics check
         const qtyRaw = row[idxQuantity]?.trim().replace(/[^0-9\.]/g, '');
-        const priceRaw = row[idxPrice]?.trim().replace(/[^0-9\.]/g, '');
-
         const quantity = qtyRaw ? Number(qtyRaw) : 1;
-        const pricePerUnit = priceRaw ? Number(priceRaw) : 0;
 
         if (isNaN(quantity) || quantity <= 0) {
           throw new Error(`Kuantitas '${row[idxQuantity]}' harus berupa angka positif.`);
         }
-        if (isNaN(pricePerUnit) || pricePerUnit < 0) {
-          throw new Error(`Harga satuan '${row[idxPrice]}' harus berupa angka positif.`);
+
+        const totalRaw = idxTotal !== -1 ? row[idxTotal]?.trim().replace(/[^0-9\.]/g, '') : '';
+        const priceRaw = idxPrice !== -1 ? row[idxPrice]?.trim().replace(/[^0-9\.]/g, '') : '';
+
+        let pricePerUnit = 0;
+        let totalAmount: Prisma.Decimal;
+
+        if (totalRaw && totalRaw !== '') {
+          const totalVal = Number(totalRaw);
+          if (isNaN(totalVal) || totalVal < 0) {
+            throw new Error(`Total biaya '${row[idxTotal]}' harus berupa angka positif.`);
+          }
+          totalAmount = new Prisma.Decimal(totalVal);
+          pricePerUnit = totalVal / quantity;
+        } else {
+          if (!priceRaw || priceRaw === '') {
+            throw new Error('Harga Satuan atau Total Biaya wajib diisi.');
+          }
+          const priceVal = Number(priceRaw);
+          if (isNaN(priceVal) || priceVal < 0) {
+            throw new Error(`Harga satuan '${row[idxPrice]}' harus berupa angka positif.`);
+          }
+          pricePerUnit = priceVal;
+          totalAmount = new Prisma.Decimal(quantity * pricePerUnit);
         }
 
-        const totalAmount = new Prisma.Decimal(quantity * pricePerUnit);
         const unit = row[idxUnit]?.trim() || 'Unit';
 
         // 6. Payment Method check

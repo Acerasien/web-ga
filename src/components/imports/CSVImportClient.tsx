@@ -104,6 +104,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       const idxQuantity = headers.findIndex(h => h.includes('kuantitas') || h.includes('jumlah') || h.includes('qty') || h.includes('quantity'));
       const idxUnit = headers.findIndex(h => h.includes('satuan') || h.includes('unit'));
       const idxPrice = headers.findIndex(h => h.includes('harga') || h.includes('price'));
+      const idxTotal = headers.findIndex(h => h.includes('total') || h.includes('jumlah biaya') || h.includes('total biaya'));
       const idxPayment = headers.findIndex(h => h.includes('pembayaran') || h.includes('payment') || h.includes('metode'));
       const idxLocation = headers.findIndex(h => h === 'lokasi' || h.includes('location'));
       const idxBranch = headers.findIndex(h => h.includes('cabang') || h.includes('branch'));
@@ -112,7 +113,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       const idxInvoice = headers.findIndex(h => h.includes('invoice') || h.includes('faktur') || h === 'inv' || h.includes('no_inv'));
 
       // Validate mandatory columns exist in headers
-      if (idxDate === -1 || idxCategory === -1 || idxDescription === -1 || idxQuantity === -1 || idxUnit === -1 || idxPrice === -1) {
+      if (idxDate === -1 || idxCategory === -1 || idxDescription === -1 || idxQuantity === -1 || idxUnit === -1 || (idxPrice === -1 && idxTotal === -1)) {
         setPreviewRows([]);
         setPreviewSummary({ totalRows: 0, totalAmount: 0, hasErrors: true });
         return;
@@ -132,11 +133,21 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         const descriptionRaw = idxDescription !== -1 ? String(row[idxDescription] || '').trim() : '';
         
         const qtyRaw = idxQuantity !== -1 ? String(row[idxQuantity] || '').trim().replace(/[^0-9\.]/g, '') : '';
+        const quantity = qtyRaw ? Number(qtyRaw) : 1;
+
+        const totalRaw = idxTotal !== -1 ? String(row[idxTotal] || '').trim().replace(/[^0-9\.]/g, '') : '';
         const priceRaw = idxPrice !== -1 ? String(row[idxPrice] || '').trim().replace(/[^0-9\.]/g, '') : '';
         
-        const quantity = qtyRaw ? Number(qtyRaw) : 1;
-        const pricePerUnit = priceRaw ? Number(priceRaw) : 0;
-        const subtotal = quantity * pricePerUnit;
+        let pricePerUnit = 0;
+        let subtotal = 0;
+        
+        if (totalRaw && totalRaw !== '') {
+          subtotal = Number(totalRaw);
+          pricePerUnit = subtotal / quantity;
+        } else {
+          pricePerUnit = priceRaw ? Number(priceRaw) : 0;
+          subtotal = quantity * pricePerUnit;
+        }
 
         if (!isNaN(subtotal)) {
           totalAmount += subtotal;
@@ -155,7 +166,22 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         if (!dateRaw) errors.push('Tanggal tidak boleh kosong');
         if (!descriptionRaw) errors.push('Deskripsi tidak boleh kosong');
         if (isNaN(quantity) || quantity <= 0) errors.push('Kuantitas harus positif');
-        if (isNaN(pricePerUnit) || pricePerUnit < 0) errors.push('Harga satuan harus positif');
+        
+        if (totalRaw) {
+          const totalVal = Number(totalRaw);
+          if (isNaN(totalVal) || totalVal < 0) {
+            errors.push('Total biaya harus berupa angka positif');
+          }
+        } else {
+          if (!priceRaw || priceRaw === '') {
+            errors.push('Harga Satuan atau Total Biaya wajib diisi');
+          } else {
+            const priceVal = Number(priceRaw);
+            if (isNaN(priceVal) || priceVal < 0) {
+              errors.push('Harga satuan harus berupa angka positif');
+            }
+          }
+        }
 
         let locationVal = '';
         if (locationRaw) {
@@ -300,6 +326,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       "Kuantitas",
       "Satuan",
       "Harga Satuan",
+      "Total Biaya",
       "Pembayaran",
       "Lokasi",
       "Vendor",
@@ -317,6 +344,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         15,
         "Box",
         35000,
+        "",
         "CASH",
         "Office",
         "RM Padang Sinar",
@@ -331,7 +359,8 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
         "Pembelian kertas HVS A4 untuk printer",
         5,
         "Rim",
-        48000,
+        "",
+        240000,
         "PETTY_CASH",
         "Site",
         "Toko Buku Jaya",
@@ -355,6 +384,7 @@ export default function CSVImportClient({ user }: CSVImportClientProps) {
       { wch: 10 }, // Kuantitas
       { wch: 8 },  // Satuan
       { wch: 12 }, // Harga Satuan
+      { wch: 12 }, // Total Biaya
       { wch: 12 }, // Pembayaran
       { wch: 12 }, // Lokasi
       { wch: 20 }, // Vendor
