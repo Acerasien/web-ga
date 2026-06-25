@@ -51,6 +51,8 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
     setFormError(null);
   };
   const [description, setDescription] = useState<string>('');
+  const [quantity, setQuantity] = useState<string>('1');
+  const [unit, setUnit] = useState<string>('Pcs');
   const [amountNeeded, setAmountNeeded] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [receiptPath, setReceiptPath] = useState<string>('');
@@ -147,6 +149,7 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
     const parsedCategoryId = Number(categoryId);
     const parsedSubCategoryId = subCategoryId ? Number(subCategoryId) : undefined;
     const parsedAmount = parseFloat(amountNeeded.replace(/[^0-9]/g, ''));
+    const parsedQty = quantity ? parseFloat(quantity) : undefined;
 
     if (!parsedBranchId) {
       setValidationError('Mohon tentukan cabang penanggung jawab.');
@@ -160,16 +163,26 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
       setValidationError('Mohon masukkan deskripsi singkat.');
       return;
     }
+    if (parsedQty !== undefined && (isNaN(parsedQty) || parsedQty <= 0)) {
+      setValidationError('Kuantitas harus berupa angka positif.');
+      return;
+    }
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       setValidationError('Mohon masukkan jumlah uang yang dibutuhkan dengan benar.');
       return;
     }
 
     // Direct submit
-    executeSubmit(parsedBranchId, parsedCategoryId, parsedSubCategoryId, parsedAmount);
+    executeSubmit(parsedBranchId, parsedCategoryId, parsedSubCategoryId, parsedAmount, parsedQty);
   };
 
-  const executeSubmit = (parsedBranchId: number, parsedCategoryId: number, parsedSubCategoryId: number | undefined, parsedAmount: number) => {
+  const executeSubmit = (
+    parsedBranchId: number,
+    parsedCategoryId: number,
+    parsedSubCategoryId: number | undefined,
+    parsedAmount: number,
+    parsedQty: number | undefined
+  ) => {
     startTransition(async () => {
       try {
         const res = await createOngoingPayment({
@@ -178,6 +191,8 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
           subCategoryId: parsedSubCategoryId,
           description: description.trim(),
           amountNeeded: parsedAmount,
+          quantity: parsedQty,
+          unit: unit.trim() || undefined,
           initialReceiptPath: receiptPath || undefined,
           requestDate,
           frequency: frequency || undefined,
@@ -206,6 +221,8 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
     setSubCategoryId('');
     if (user.role !== 'ADMIN') setBranchId('');
     setDescription('');
+    setQuantity('1');
+    setUnit('Pcs');
     setAmountNeeded('');
     setFrequency('');
     setLocation('');
@@ -395,6 +412,40 @@ export default function OngoingInputClient({ user, categories, branches }: Ongoi
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={isPending}
                 required
+              />
+            </div>
+
+            {/* Quantity Field */}
+            <div className={styles.formGroup}>
+              <label htmlFor="quantity" className={styles.label}>
+                Jumlah (Kuantitas) (Opsional)
+              </label>
+              <input
+                id="quantity"
+                type="number"
+                step="0.01"
+                min="0.01"
+                className={styles.input}
+                placeholder="Contoh: 1"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                disabled={isPending}
+              />
+            </div>
+
+            {/* Unit Field */}
+            <div className={styles.formGroup}>
+              <label htmlFor="unit" className={styles.label}>
+                Satuan Ukur (Opsional)
+              </label>
+              <input
+                id="unit"
+                type="text"
+                className={styles.input}
+                placeholder="Contoh: Pcs, Liter, Rim"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                disabled={isPending}
               />
             </div>
 

@@ -44,6 +44,10 @@ export default function OngoingEditModal({
   );
   const [location, setLocation] = useState<string>(payment.location || '');
   const [description, setDescription] = useState<string>(payment.description);
+  const [quantity, setQuantity] = useState<string>(
+    payment.quantity !== null && payment.quantity !== undefined ? String(payment.quantity) : '1'
+  );
+  const [unit, setUnit] = useState<string>(payment.unit || 'Pcs');
   const [amountNeeded, setAmountNeeded] = useState<string>(
     Math.round(payment.amountNeeded).toLocaleString('id-ID')
   );
@@ -146,6 +150,7 @@ export default function OngoingEditModal({
     const parsedCategoryId = Number(categoryId);
     const parsedSubCategoryId = subCategoryId ? Number(subCategoryId) : undefined;
     const parsedAmount = parseFloat(amountNeeded.replace(/[^0-9]/g, ''));
+    const parsedQty = quantity ? parseFloat(quantity) : undefined;
 
     if (!parsedBranchId) {
       setError('Mohon tentukan cabang.');
@@ -157,6 +162,10 @@ export default function OngoingEditModal({
     }
     if (!description.trim()) {
       setError('Mohon masukkan deskripsi singkat.');
+      return;
+    }
+    if (parsedQty !== undefined && (isNaN(parsedQty) || parsedQty <= 0)) {
+      setError('Kuantitas harus berupa angka positif.');
       return;
     }
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
@@ -172,6 +181,8 @@ export default function OngoingEditModal({
           subCategoryId: parsedSubCategoryId,
           description: description.trim(),
           amountNeeded: parsedAmount,
+          quantity: parsedQty,
+          unit: unit.trim() || undefined,
           initialReceiptPath: receiptPath || undefined,
           requestDate,
           frequency: frequency || undefined,
@@ -389,6 +400,37 @@ export default function OngoingEditModal({
                       onChange={(e) => setDescription(e.target.value)}
                       className={styles.input}
                     />
+                  </div>
+
+                  {/* Quantity and Unit Input Row */}
+                  <div className={styles.grid}>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>
+                        Jumlah (Kuantitas) (Opsional)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        placeholder="Contoh: 1"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        className={styles.input}
+                      />
+                    </div>
+
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>
+                        Satuan Ukur (Opsional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Pcs, Liter, Rim"
+                        value={unit}
+                        onChange={(e) => setUnit(e.target.value)}
+                        className={styles.input}
+                      />
+                    </div>
                   </div>
 
                   {/* Amount Needed Input */}

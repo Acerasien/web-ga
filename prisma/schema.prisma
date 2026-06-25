@@ -188,6 +188,8 @@ model OngoingPayment {
   userId             Int            @map("user_id")
   description        String         @db.VarChar(255)
   amountNeeded       Decimal        @map("amount_needed") @db.Decimal(15, 2)
+  quantity           Decimal?       @db.Decimal(10, 2)
+  unit               String?        @db.VarChar(20)
   initialReceiptPath String?        @map("initial_receipt_path") @db.VarChar(500)
   finalReceiptPath   String?        @map("final_receipt_path") @db.VarChar(500)
   status             String         @default("BELUM_DIBAYAR") @db.VarChar(20) // BELUM_DIBAYAR, SUDAH_DIBAYAR, TER_REALISASI

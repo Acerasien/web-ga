@@ -211,7 +211,12 @@ export default function OngoingHistoryClient({
                         )}
                       </td>
                       <td className={styles.td} style={{ textAlign: 'right', fontWeight: 600 }}>
-                        {formatRupiah(est)}
+                        <div>{formatRupiah(est)}</div>
+                        {p.quantity !== null && p.quantity !== undefined ? (
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px', fontWeight: 500 }}>
+                            {p.quantity} {p.unit || 'Pcs'}
+                          </div>
+                        ) : null}
                       </td>
                       <td className={styles.td} style={{ textAlign: 'right', fontWeight: 700, color: 'var(--color-primary)' }}>
                         {formatRupiah(act)}

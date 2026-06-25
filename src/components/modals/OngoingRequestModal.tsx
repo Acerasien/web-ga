@@ -33,6 +33,8 @@ export default function OngoingRequestModal({
   );
   const [categoryId, setCategoryId] = useState<string>('');
   const [description, setDescription] = useState<string>('');
+  const [quantity, setQuantity] = useState<string>('1');
+  const [unit, setUnit] = useState<string>('Pcs');
   const [amountNeeded, setAmountNeeded] = useState<string>('');
   const [receiptPath, setReceiptPath] = useState<string>('');
   const [requestDate, setRequestDate] = useState<string>(() => {
@@ -111,6 +113,7 @@ export default function OngoingRequestModal({
     const parsedBranchId = user.role === 'ADMIN' ? user.branchId! : Number(branchId);
     const parsedCategoryId = Number(categoryId);
     const parsedAmount = parseFloat(amountNeeded.replace(/[^0-9]/g, ''));
+    const parsedQty = quantity ? parseFloat(quantity) : undefined;
 
     if (!parsedBranchId) {
       setError('Mohon tentukan cabang.');
@@ -122,6 +125,10 @@ export default function OngoingRequestModal({
     }
     if (!description.trim()) {
       setError('Mohon masukkan deskripsi singkat.');
+      return;
+    }
+    if (parsedQty !== undefined && (isNaN(parsedQty) || parsedQty <= 0)) {
+      setError('Kuantitas harus berupa angka positif.');
       return;
     }
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
@@ -136,6 +143,8 @@ export default function OngoingRequestModal({
           categoryId: parsedCategoryId,
           description: description.trim(),
           amountNeeded: parsedAmount,
+          quantity: parsedQty,
+          unit: unit.trim() || undefined,
           initialReceiptPath: receiptPath || undefined,
           requestDate,
         });
@@ -161,6 +170,8 @@ export default function OngoingRequestModal({
     setCategoryId('');
     if (user.role !== 'ADMIN') setBranchId('');
     setDescription('');
+    setQuantity('1');
+    setUnit('Pcs');
     setAmountNeeded('');
     setReceiptPath('');
     setFileName('');
@@ -284,6 +295,38 @@ export default function OngoingRequestModal({
                       onChange={(e) => setDescription(e.target.value)}
                       style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }}
                     />
+                  </div>
+
+                  {/* Quantity and Unit Input Group */}
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    {/* Quantity */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                      <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                        Jumlah (Kuantitas) (Opsional)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        placeholder="Contoh: 1"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }}
+                      />
+                    </div>
+                    {/* Unit */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                      <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-muted)' }}>
+                        Satuan Ukur (Opsional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Pcs, Liter, Rim"
+                        value={unit}
+                        onChange={(e) => setUnit(e.target.value)}
+                        style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface)', color: 'var(--color-text)' }}
+                      />
+                    </div>
                   </div>
 
                   {/* Amount Needed Input */}

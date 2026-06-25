@@ -12,9 +12,10 @@ import { createAuditLog } from '@/lib/actions/audit';
 // Types
 // ============================================================
 
-export interface OngoingPaymentWithRelations extends Omit<OngoingPayment, 'amountNeeded' | 'actualAmount'> {
+export interface OngoingPaymentWithRelations extends Omit<OngoingPayment, 'amountNeeded' | 'actualAmount' | 'quantity'> {
   amountNeeded: number;
   actualAmount: number | null;
+  quantity: number | null;
   category: Category;
   subCategory?: SubCategory | null;
   branch: Branch;
@@ -139,6 +140,7 @@ export async function getOngoingPayments(
       ...p,
       amountNeeded: Number(p.amountNeeded),
       actualAmount: p.actualAmount ? Number(p.actualAmount) : null,
+      quantity: p.quantity ? Number(p.quantity) : null,
     }));
 
     return {
@@ -165,6 +167,8 @@ export async function createOngoingPayment(data: {
   subCategoryId?: number;
   description: string;
   amountNeeded: number;
+  quantity?: number;
+  unit?: string;
   initialReceiptPath?: string;
   requestDate?: string;
   frequency?: string;
@@ -199,6 +203,10 @@ export async function createOngoingPayment(data: {
       return { success: false, error: 'Mohon isi semua bidang wajib dengan benar.' };
     }
 
+    if (data.quantity !== undefined && data.quantity !== null && data.quantity <= 0) {
+      return { success: false, error: 'Kuantitas harus berupa angka positif.' };
+    }
+
     // Input length validation (Finding #10)
     if (data.description.length > 255) {
       return { success: false, error: 'Deskripsi request maksimal 255 karakter.' };
@@ -224,6 +232,8 @@ export async function createOngoingPayment(data: {
         userId: user.id,
         description: data.description.trim(),
         amountNeeded: new Prisma.Decimal(data.amountNeeded),
+        quantity: data.quantity !== undefined && data.quantity !== null ? new Prisma.Decimal(data.quantity) : null,
+        unit: data.unit?.trim() || null,
         initialReceiptPath: data.initialReceiptPath || null,
         requestDate: data.requestDate ? new Date(data.requestDate) : new Date(),
         status: 'BELUM_DIBAYAR',
@@ -379,6 +389,11 @@ export async function realizeOngoingPayment(
       finalBeritaAcara = trimmedBA;
     }
 
+    // Calculate quantity and pricePerUnit based on the request's stored quantity
+    const opQty = payment.quantity ? Number(payment.quantity) : 1;
+    const opUnit = payment.unit || 'Transaksi';
+    const calcPricePerUnit = data.actualAmount / opQty;
+
     // Run realization inside a transactional container
     await prisma.$transaction(async (tx) => {
       // 1. Create matching historical Transaction record
@@ -390,9 +405,9 @@ export async function realizeOngoingPayment(
           subCategoryId: payment.subCategoryId,
           transactionDate: txDate,
           description: `[Realisasi] ${payment.description.trim()}`,
-          quantity: new Prisma.Decimal(1),
-          unit: 'Transaksi',
-          pricePerUnit: new Prisma.Decimal(data.actualAmount),
+          quantity: new Prisma.Decimal(opQty),
+          unit: opUnit,
+          pricePerUnit: new Prisma.Decimal(calcPricePerUnit),
           totalAmount: new Prisma.Decimal(data.actualAmount),
           paymentMethod: data.paymentMethod,
           vendor: data.vendor?.trim() || payment.vendor || null,
@@ -441,6 +456,8 @@ export async function updateOngoingPayment(
     subCategoryId?: number;
     description: string;
     amountNeeded: number;
+    quantity?: number;
+    unit?: string;
     initialReceiptPath?: string;
     requestDate?: string;
     frequency?: string;
@@ -490,6 +507,10 @@ export async function updateOngoingPayment(
       return { success: false, error: 'Mohon isi semua bidang wajib dengan benar.' };
     }
 
+    if (data.quantity !== undefined && data.quantity !== null && data.quantity <= 0) {
+      return { success: false, error: 'Kuantitas harus berupa angka positif.' };
+    }
+
     // Input length validation (Finding #10)
     if (data.description.length > 255) {
       return { success: false, error: 'Deskripsi request maksimal 255 karakter.' };
@@ -515,6 +536,8 @@ export async function updateOngoingPayment(
         subCategoryId: data.subCategoryId ? Number(data.subCategoryId) : null,
         description: data.description.trim(),
         amountNeeded: new Prisma.Decimal(data.amountNeeded),
+        quantity: data.quantity !== undefined && data.quantity !== null ? new Prisma.Decimal(data.quantity) : null,
+        unit: data.unit?.trim() || null,
         initialReceiptPath: data.initialReceiptPath || null,
         requestDate: data.requestDate ? new Date(data.requestDate) : new Date(),
         frequency: data.frequency || null,

@@ -62,6 +62,8 @@ export default function OngoingDashboardClient({
     amount: number;
     description: string;
     vendor?: string;
+    quantity?: number | null;
+    unit?: string | null;
   } | null>(null);
 
   // Transaction Detail Modal state
@@ -150,7 +152,9 @@ export default function OngoingDashboardClient({
       id: payment.id,
       amount: payment.amountNeeded,
       description: payment.description,
-      vendor: payment.vendor || '',
+      vendor: payment.vendor || undefined,
+      quantity: payment.quantity,
+      unit: payment.unit,
     });
     setIsRealizeOpen(true);
   };
@@ -320,7 +324,14 @@ export default function OngoingDashboardClient({
                   )}
 
                   <div className={styles.costSection}>
-                    <span className={styles.costLabel}>Estimasi Kebutuhan</span>
+                    <div>
+                      <span className={styles.costLabel}>Estimasi Kebutuhan</span>
+                      {p.quantity !== null && p.quantity !== undefined ? (
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px', fontWeight: 600 }}>
+                          Kuantitas: {p.quantity} {p.unit || 'Pcs'}
+                        </div>
+                      ) : null}
+                    </div>
                     <span className={styles.costValue}>{formatRupiah(p.amountNeeded)}</span>
                   </div>
 
@@ -446,6 +457,8 @@ export default function OngoingDashboardClient({
           estimatedAmount={realizeData.amount}
           description={realizeData.description}
           defaultVendor={realizeData.vendor}
+          quantity={realizeData.quantity ?? undefined}
+          unit={realizeData.unit ?? undefined}
         />
       )}
 

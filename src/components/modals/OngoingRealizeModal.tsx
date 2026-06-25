@@ -15,6 +15,8 @@ interface OngoingRealizeModalProps {
   estimatedAmount: number;
   description: string;
   defaultVendor?: string;
+  quantity?: number;
+  unit?: string;
 }
 
 export default function OngoingRealizeModal({
@@ -25,6 +27,8 @@ export default function OngoingRealizeModal({
   estimatedAmount,
   description,
   defaultVendor,
+  quantity,
+  unit,
 }: OngoingRealizeModalProps) {
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -217,7 +221,14 @@ export default function OngoingRealizeModal({
                   <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text)' }}>{description}</span>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--color-border)', paddingTop: '6px', marginTop: '6px', fontSize: 'var(--text-xs)' }}>
                     <span style={{ color: 'var(--color-text-muted)' }}>Estimasi Awal:</span>
-                    <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>{formatRupiah(estimatedAmount)}</span>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>{formatRupiah(estimatedAmount)}</span>
+                      {quantity !== null && quantity !== undefined ? (
+                        <div style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                          ({quantity} {unit || 'Pcs'})
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
