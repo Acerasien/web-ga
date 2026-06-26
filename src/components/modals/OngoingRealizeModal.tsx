@@ -17,6 +17,7 @@ interface OngoingRealizeModalProps {
   defaultVendor?: string;
   quantity?: number;
   unit?: string;
+  requestDate: Date | string;
 }
 
 export default function OngoingRealizeModal({
@@ -29,6 +30,7 @@ export default function OngoingRealizeModal({
   defaultVendor,
   quantity,
   unit,
+  requestDate,
 }: OngoingRealizeModalProps) {
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +44,7 @@ export default function OngoingRealizeModal({
   const [beritaAcara, setBeritaAcara] = useState<string>('');
   const [receiptPath, setReceiptPath] = useState<string>('');
   const [transactionDate, setTransactionDate] = useState<string>(() => {
-    const d = new Date();
+    const d = new Date(requestDate);
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -179,7 +181,7 @@ export default function OngoingRealizeModal({
     setError(null);
     setSuccess(false);
     setUploadError(null);
-    const d = new Date();
+    const d = new Date(requestDate);
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -240,16 +242,15 @@ export default function OngoingRealizeModal({
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {/* Realization Date Input */}
+                  {/* Realization Date Input - Locked to Tanggal Pengajuan (Anchor) */}
                   <div className={styles.formGroup}>
-                    <label className={`${styles.formLabel} ${styles.labelRequired}`}>
-                      Tanggal Realisasi Belanja
+                    <label className={styles.formLabel}>
+                      Tanggal Pengajuan (Terkunci sebagai Tanggal Transaksi)
                     </label>
                     <input
                       type="date"
                       value={transactionDate}
-                      onChange={(e) => setTransactionDate(e.target.value)}
-                      required
+                      disabled
                       className={styles.input}
                     />
                   </div>
@@ -293,9 +294,26 @@ export default function OngoingRealizeModal({
 
                   {/* Realized Spent Cost */}
                   <div className={styles.formGroup}>
-                    <label className={`${styles.formLabel} ${styles.labelRequired}`}>
-                      Total Uang Realisasi yang Dibelanjakan
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <label className={`${styles.formLabel} ${styles.labelRequired}`}>
+                        Total Uang Realisasi yang Dibelanjakan
+                      </label>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer', userSelect: 'none' }}>
+                        <input
+                          type="checkbox"
+                          checked={parseFloat(actualAmount.replace(/[^0-9]/g, '')) === estimatedAmount}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setActualAmount(estimatedAmount.toLocaleString('id-ID'));
+                            } else {
+                              setActualAmount('');
+                            }
+                          }}
+                          style={{ accentColor: 'var(--color-primary)', cursor: 'pointer', width: '14px', height: '14px' }}
+                        />
+                        <span>Sama dengan estimasi ({formatRupiah(estimatedAmount)})</span>
+                      </label>
+                    </div>
                     <div style={{ position: 'relative' }}>
                       <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', fontWeight: 600 }}>Rp</span>
                       <input

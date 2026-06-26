@@ -4,6 +4,7 @@ import { getDashboardStats } from '@/lib/actions/dashboard';
 import { getReportData } from '@/lib/actions/reports';
 import { getBranches } from '@/lib/actions/categories';
 import DashboardClient from '@/components/dashboard/DashboardClient';
+import { getPeriodicMonthAndYear } from '@/lib/periodicDate';
 
 interface PageProps {
   searchParams: Promise<{
@@ -26,8 +27,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const selectedBranchId = branchId ? Number(branchId) : undefined;
 
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  const { month: currentMonth, year: currentYear } = getPeriodicMonthAndYear(now);
 
   // Execute database queries in parallel to optimize rendering speed (Poka-Yoke)
   const [statsResponse, chartResponse, branchesResponse] = await Promise.all([

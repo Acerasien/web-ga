@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import type { OngoingPaymentWithRelations } from './ongoing';
 import { checkAndSpawnRecurringBills } from './recurring';
 import type { RecurringBill, Category, Branch } from '@prisma/client';
+import { getPeriodicBounds } from '@/lib/periodicDate';
 
 export interface DueRecurringPayment {
   id: number;           // OngoingPayment id
@@ -68,10 +69,8 @@ export async function getDashboardStats(selectedBranchId?: number): Promise<ApiR
         ? await checkAndSpawnRecurringBills(branchIdFilter ?? null)
         : { spawned: 0, pendingCount: 0 };
 
-    // Determine current month calendar boundaries in local timezone
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    // Determine current month boundaries based on shifted periodic cycles (21st to 20th)
+    const { startDate: startOfMonth, endDate: endOfMonth } = getPeriodicBounds(new Date());
 
     // Build the dynamic Prisma where clause
     const baseWhere: Prisma.TransactionWhereInput = {

@@ -43,6 +43,7 @@ import { getReportData, getBranchComparisonData } from '@/lib/actions/reports';
 import type { ReportPayload, ComparisonDataPoint, ComparisonPeriod, CategoryBreakdown } from '@/lib/actions/reports';
 import { getTransactions } from '@/lib/actions/transactions';
 import { getOngoingPayments } from '@/lib/actions/ongoing';
+import { getPeriodicMonthAndYear, getBoundsForPeriodicMonth } from '@/lib/periodicDate';
 import { getCategoriesWithSub } from '@/lib/actions/categories';
 import type { CategoryWithSub } from '@/lib/actions/categories';
 import type { Branch } from '@prisma/client';
@@ -81,8 +82,8 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
 
   // Summary Tab Filters States
   const [period, setPeriod] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'>('MONTHLY');
-  const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [months, setMonths] = useState<number[]>([new Date().getMonth() + 1]);
+  const [year, setYear] = useState<number>(() => getPeriodicMonthAndYear(new Date()).year);
+  const [months, setMonths] = useState<number[]>(() => [getPeriodicMonthAndYear(new Date()).month]);
   const [branchIds, setBranchIds] = useState<number[]>([]);
 
   // Summary Tab Report Metrics States
@@ -95,8 +96,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
   // Comparison Tab Filters States
   const [compPeriods, setCompPeriods] = useState<ComparisonPeriod[]>(() => {
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1; // 1-indexed
+    const { month: currentMonth, year: currentYear } = getPeriodicMonthAndYear(now);
 
     let prevYear = currentYear;
     let prevMonth = currentMonth - 1;
@@ -320,17 +320,21 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
       let startDateStr: string | undefined = undefined;
       let endDateStr: string | undefined = undefined;
 
+      const formatYYYYMMDD = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
       if (period === 'YEARLY') {
-        startDateStr = `${year - 4}-01-01`;
-        endDateStr = `${year}-12-31`;
+        startDateStr = `${year - 5}-12-21`;
+        endDateStr = `${year}-12-20`;
       } else {
         const minMonth = Math.min(...months);
         const maxMonth = Math.max(...months);
-        const daysInMaxMonth = new Date(year, maxMonth, 0).getDate();
-        const formattedMinMonth = String(minMonth).padStart(2, '0');
-        const formattedMaxMonth = String(maxMonth).padStart(2, '0');
-        startDateStr = `${year}-${formattedMinMonth}-01`;
-        endDateStr = `${year}-${formattedMaxMonth}-${daysInMaxMonth}`;
+        startDateStr = formatYYYYMMDD(getBoundsForPeriodicMonth(minMonth, year).startDate);
+        endDateStr = formatYYYYMMDD(getBoundsForPeriodicMonth(maxMonth, year).endDate);
       }
 
       const result = await getTransactions({
@@ -358,7 +362,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         exportedOngoings = ongoingResult.data.payments;
         // Filter in-memory by selected months and branchIds
         if (period !== 'YEARLY' && months.length > 0) {
-          exportedOngoings = exportedOngoings.filter(p => months.includes(new Date(p.requestDate || p.createdAt).getMonth() + 1));
+          exportedOngoings = exportedOngoings.filter(p => months.includes(getPeriodicMonthAndYear(p.requestDate || p.createdAt).month));
         }
         if (branchIds.length > 0) {
           exportedOngoings = exportedOngoings.filter(p => branchIds.includes(p.branchId));
@@ -368,12 +372,12 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         // Filter by year in-memory
         if (period === 'YEARLY') {
           exportedOngoings = exportedOngoings.filter(p => {
-            const y = new Date(p.requestDate || p.createdAt).getFullYear();
+            const y = getPeriodicMonthAndYear(p.requestDate || p.createdAt).year;
             return y >= year - 4 && y <= year;
           });
         } else {
           exportedOngoings = exportedOngoings.filter(p => {
-            const y = new Date(p.requestDate || p.createdAt).getFullYear();
+            const y = getPeriodicMonthAndYear(p.requestDate || p.createdAt).year;
             return y === year;
           });
         }
@@ -382,7 +386,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
       // Filter in-memory by selected months and branchIds
       let exportedTxs = result.data.transactions;
       if (period !== 'YEARLY' && months.length > 0) {
-        exportedTxs = exportedTxs.filter(tx => months.includes(new Date(tx.transactionDate).getMonth() + 1));
+        exportedTxs = exportedTxs.filter(tx => months.includes(getPeriodicMonthAndYear(tx.transactionDate).month));
       }
       if (branchIds.length > 0) {
         exportedTxs = exportedTxs.filter(tx => branchIds.includes(tx.branchId));
@@ -466,17 +470,21 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
       let startDateStr: string | undefined = undefined;
       let endDateStr: string | undefined = undefined;
 
+      const formatYYYYMMDD = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
       if (period === 'YEARLY') {
-        startDateStr = `${year - 4}-01-01`;
-        endDateStr = `${year}-12-31`;
+        startDateStr = `${year - 5}-12-21`;
+        endDateStr = `${year}-12-20`;
       } else {
         const minMonth = Math.min(...months);
         const maxMonth = Math.max(...months);
-        const daysInMaxMonth = new Date(year, maxMonth, 0).getDate();
-        const formattedMinMonth = String(minMonth).padStart(2, '0');
-        const formattedMaxMonth = String(maxMonth).padStart(2, '0');
-        startDateStr = `${year}-${formattedMinMonth}-01`;
-        endDateStr = `${year}-${formattedMaxMonth}-${daysInMaxMonth}`;
+        startDateStr = formatYYYYMMDD(getBoundsForPeriodicMonth(minMonth, year).startDate);
+        endDateStr = formatYYYYMMDD(getBoundsForPeriodicMonth(maxMonth, year).endDate);
       }
 
       const result = await getTransactions({
@@ -504,7 +512,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         exportedOngoings = ongoingResult.data.payments;
         // Filter in-memory by selected months and branchIds
         if (period !== 'YEARLY' && months.length > 0) {
-          exportedOngoings = exportedOngoings.filter(p => months.includes(new Date(p.requestDate || p.createdAt).getMonth() + 1));
+          exportedOngoings = exportedOngoings.filter(p => months.includes(getPeriodicMonthAndYear(p.requestDate || p.createdAt).month));
         }
         if (branchIds.length > 0) {
           exportedOngoings = exportedOngoings.filter(p => branchIds.includes(p.branchId));
@@ -514,12 +522,12 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         // Filter by year in-memory
         if (period === 'YEARLY') {
           exportedOngoings = exportedOngoings.filter(p => {
-            const y = new Date(p.requestDate || p.createdAt).getFullYear();
+            const y = getPeriodicMonthAndYear(p.requestDate || p.createdAt).year;
             return y >= year - 4 && y <= year;
           });
         } else {
           exportedOngoings = exportedOngoings.filter(p => {
-            const y = new Date(p.requestDate || p.createdAt).getFullYear();
+            const y = getPeriodicMonthAndYear(p.requestDate || p.createdAt).year;
             return y === year;
           });
         }
@@ -528,7 +536,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
       // Filter in-memory by selected months and branchIds
       let exportedTxs = result.data.transactions;
       if (period !== 'YEARLY' && months.length > 0) {
-        exportedTxs = exportedTxs.filter(tx => months.includes(new Date(tx.transactionDate).getMonth() + 1));
+        exportedTxs = exportedTxs.filter(tx => months.includes(getPeriodicMonthAndYear(tx.transactionDate).month));
       }
       if (branchIds.length > 0) {
         exportedTxs = exportedTxs.filter(tx => branchIds.includes(tx.branchId));
@@ -658,17 +666,21 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         let startDateStr: string | undefined = undefined;
         let endDateStr: string | undefined = undefined;
 
+        const formatYYYYMMDD = (d: Date) => {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        };
+
         if (period === 'YEARLY') {
-          startDateStr = `${year - 4}-01-01`;
-          endDateStr = `${year}-12-31`;
+          startDateStr = `${year - 5}-12-21`;
+          endDateStr = `${year}-12-20`;
         } else {
           const minMonth = Math.min(...months);
           const maxMonth = Math.max(...months);
-          const daysInMaxMonth = new Date(year, maxMonth, 0).getDate();
-          const formattedMinMonth = String(minMonth).padStart(2, '0');
-          const formattedMaxMonth = String(maxMonth).padStart(2, '0');
-          startDateStr = `${year}-${formattedMinMonth}-01`;
-          endDateStr = `${year}-${formattedMaxMonth}-${daysInMaxMonth}`;
+          startDateStr = formatYYYYMMDD(getBoundsForPeriodicMonth(minMonth, year).startDate);
+          endDateStr = formatYYYYMMDD(getBoundsForPeriodicMonth(maxMonth, year).endDate);
         }
 
         const result = await getTransactions({
@@ -682,7 +694,7 @@ export default function LaporanClient({ user, branches }: LaporanClientProps) {
         if (result.success && result.data) {
           let exportedTxs = result.data.transactions;
           if (period !== 'YEARLY' && months.length > 0) {
-            exportedTxs = exportedTxs.filter(tx => months.includes(new Date(tx.transactionDate).getMonth() + 1));
+            exportedTxs = exportedTxs.filter(tx => months.includes(getPeriodicMonthAndYear(tx.transactionDate).month));
           }
           if (branchIds.length > 0) {
             exportedTxs = exportedTxs.filter(tx => branchIds.includes(tx.branchId));

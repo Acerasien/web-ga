@@ -367,8 +367,8 @@ export async function realizeOngoingPayment(
       return { success: false, error: 'Nomor Berita Acara maksimal 50 karakter.' };
     }
 
-    // Save transaction inside database with optional custom Berita Acara (BA)
-    const txDate = data.transactionDate ? new Date(data.transactionDate) : new Date();
+    // Anchor transaction date to the original payment's request date (Tanggal Pengajuan)
+    const txDate = new Date(payment.requestDate);
 
     let finalBeritaAcara: string | null = null;
     if (data.beritaAcara && data.beritaAcara.trim() !== '') {

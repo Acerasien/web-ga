@@ -131,7 +131,7 @@ export async function createTransaction(
     if (totalAmount.lessThan(0)) totalAmount = new Prisma.Decimal(0);
 
     // Save transaction inside database with optional custom Berita Acara (BA)
-    const txDate = new Date(transactionDate);
+    let txDate = new Date(transactionDate);
 
     let finalBeritaAcara: string | null = null;
     if (beritaAcara && beritaAcara.trim() !== '') {
@@ -172,6 +172,9 @@ export async function createTransaction(
             error: 'Tagihan berjalan ini sudah dibayar sebelumnya.',
           };
         }
+
+        // Override transactionDate with original requestDate (Tanggal Pengajuan)
+        txDate = new Date(ongoingPayment.requestDate);
 
         // Use interactive transaction to guarantee consistency
         await prisma.$transaction(async (tx) => {

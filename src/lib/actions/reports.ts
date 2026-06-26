@@ -3,6 +3,11 @@
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/actions/auth';
 import type { ApiResponse } from '@/types';
+import {
+  getPeriodicMonthAndYear,
+  getBoundsForPeriodicMonth,
+  getPeriodicBounds,
+} from '@/lib/periodicDate';
 
 export interface ReportFilter {
   branchIds?: number[];
@@ -82,18 +87,18 @@ export async function getReportData(filters: ReportFilter): Promise<ApiResponse<
     }
 
     // Determine calendar date ranges based on period scale
-    const targetMonth = months && months.length > 0 ? months[0] : new Date().getMonth() + 1;
+    const targetMonth = months && months.length > 0 ? months[0] : getPeriodicMonthAndYear(new Date()).month;
     let startDate: Date;
     let endDate: Date;
 
     if (period === 'YEARLY') {
-      // Show trend for the last 5 years
-      startDate = new Date(year - 4, 0, 1);
-      endDate = new Date(year, 11, 31, 23, 59, 59, 999);
+      // Show trend for the last 5 periodic years (each starts Dec 21 of prev year and ends Dec 20 of current year)
+      startDate = new Date(year - 5, 11, 21, 0, 0, 0, 0);
+      endDate = new Date(year, 11, 20, 23, 59, 59, 999);
     } else {
-      // Query the entire year so that we have all target months covered
-      startDate = new Date(year, 0, 1);
-      endDate = new Date(year, 11, 31, 23, 59, 59, 999);
+      // Query the entire periodic year so that we have all target months covered (Dec 21 of prev year to Dec 20 of current year)
+      startDate = new Date(year - 1, 11, 21, 0, 0, 0, 0);
+      endDate = new Date(year, 11, 20, 23, 59, 59, 999);
     }
 
     // Build Prisma query condition
@@ -122,7 +127,10 @@ export async function getReportData(filters: ReportFilter): Promise<ApiResponse<
 
     // In-memory filter for selected months (if period is not YEARLY)
     const filteredTransactions = (period !== 'YEARLY' && months && months.length > 0)
-      ? transactions.filter(tx => months.includes(new Date(tx.transactionDate).getMonth() + 1))
+      ? transactions.filter(tx => {
+          const { month: periodicMonth, year: periodicYear } = getPeriodicMonthAndYear(tx.transactionDate);
+          return months.includes(periodicMonth) && periodicYear === year;
+        })
       : transactions;
 
     // 1. Calculate overall metrics
@@ -235,15 +243,24 @@ export async function getReportData(filters: ReportFilter): Promise<ApiResponse<
     const trendData: TrendCoordinate[] = [];
 
     if (period === 'DAILY') {
-      const daysInMonth = new Date(year, targetMonth, 0).getDate();
-      for (let d = 1; d <= daysInMonth; d++) {
+      const { startDate: pStart, endDate: pEnd } = getBoundsForPeriodicMonth(targetMonth, year);
+      const currentDate = new Date(pStart);
+      const monthsIndo = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+
+      while (currentDate <= pEnd) {
+        const d = currentDate.getDate();
+        const m = currentDate.getMonth() + 1;
+        const y = currentDate.getFullYear();
+
         const dayTxs = filteredTransactions.filter((tx) => {
           const txDate = new Date(tx.transactionDate);
-          return txDate.getDate() === d && txDate.getMonth() + 1 === targetMonth && txDate.getFullYear() === year;
+          return txDate.getDate() === d && txDate.getMonth() + 1 === m && txDate.getFullYear() === y;
         });
 
+        const label = `${d} ${monthsIndo[currentDate.getMonth()]}`;
+
         const coordinate: TrendCoordinate = {
-          label: `Tgl ${d}`,
+          label,
           total: dayTxs.reduce((sum, tx) => sum + Number(tx.totalAmount), 0),
         };
 
@@ -257,14 +274,22 @@ export async function getReportData(filters: ReportFilter): Promise<ApiResponse<
         });
 
         trendData.push(coordinate);
+        currentDate.setDate(currentDate.getDate() + 1);
       }
     } else if (period === 'WEEKLY') {
+      const { startDate: pStart } = getBoundsForPeriodicMonth(targetMonth, year);
+      
       for (let w = 1; w <= 5; w++) {
         const weekTxs = filteredTransactions.filter((tx) => {
           const txDate = new Date(tx.transactionDate);
-          const dayOfMonth = txDate.getDate();
-          const weekIndex = Math.ceil(dayOfMonth / 7);
-          return weekIndex === w && txDate.getMonth() + 1 === targetMonth && txDate.getFullYear() === year;
+          const diffTime = txDate.getTime() - pStart.getTime();
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          const weekIndex = Math.floor(diffDays / 7) + 1;
+          
+          if (w === 5) {
+            return weekIndex >= 5;
+          }
+          return weekIndex === w;
         });
 
         const coordinate: TrendCoordinate = {
@@ -288,7 +313,8 @@ export async function getReportData(filters: ReportFilter): Promise<ApiResponse<
       for (let m = 1; m <= 12; m++) {
         const monthTxs = filteredTransactions.filter((tx) => {
           const txDate = new Date(tx.transactionDate);
-          return txDate.getMonth() + 1 === m && txDate.getFullYear() === year;
+          const { month: periodicMonth, year: periodicYear } = getPeriodicMonthAndYear(txDate);
+          return periodicMonth === m && periodicYear === year;
         });
 
         const coordinate: TrendCoordinate = {
@@ -311,7 +337,8 @@ export async function getReportData(filters: ReportFilter): Promise<ApiResponse<
       for (let y = year - 4; y <= year; y++) {
         const yearTxs = filteredTransactions.filter((tx) => {
           const txDate = new Date(tx.transactionDate);
-          return txDate.getFullYear() === y;
+          const { year: periodicYear } = getPeriodicMonthAndYear(txDate);
+          return periodicYear === y;
         });
 
         const coordinate: TrendCoordinate = {
@@ -416,11 +443,9 @@ export async function getBranchComparisonData(
     });
 
     // 2. Fetch transactions falling in the year-month boundaries
-    const years = sortedPeriods.map((p) => p.year);
-    const minYear = Math.min(...years);
-    const maxYear = Math.max(...years);
-    const startDate = new Date(minYear, 0, 1);
-    const endDate = new Date(maxYear, 11, 31, 23, 59, 59, 999);
+    const boundsList = sortedPeriods.map(p => getBoundsForPeriodicMonth(p.month, p.year));
+    const startDate = new Date(Math.min(...boundsList.map(b => b.startDate.getTime())));
+    const endDate = new Date(Math.max(...boundsList.map(b => b.endDate.getTime())));
 
     const where: any = {
       transactionDate: {
@@ -465,10 +490,11 @@ export async function getBranchComparisonData(
         dataPoint[b.code] = 0;
       });
 
-      // Filter transactions for this specific month/year
+      // Filter transactions for this specific periodic month/year
       const matchedTxs = transactions.filter((tx) => {
         const txDate = new Date(tx.transactionDate);
-        return txDate.getMonth() + 1 === p.month && txDate.getFullYear() === p.year;
+        const { month: periodicMonth, year: periodicYear } = getPeriodicMonthAndYear(txDate);
+        return periodicMonth === p.month && periodicYear === p.year;
       });
 
       // Sum up totals

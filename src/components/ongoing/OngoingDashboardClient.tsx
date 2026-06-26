@@ -64,6 +64,7 @@ export default function OngoingDashboardClient({
     vendor?: string;
     quantity?: number | null;
     unit?: string | null;
+    requestDate: Date | string;
   } | null>(null);
 
   // Transaction Detail Modal state
@@ -155,6 +156,7 @@ export default function OngoingDashboardClient({
       vendor: payment.vendor || undefined,
       quantity: payment.quantity,
       unit: payment.unit,
+      requestDate: payment.requestDate,
     });
     setIsRealizeOpen(true);
   };
@@ -459,6 +461,7 @@ export default function OngoingDashboardClient({
           defaultVendor={realizeData.vendor}
           quantity={realizeData.quantity ?? undefined}
           unit={realizeData.unit ?? undefined}
+          requestDate={realizeData.requestDate}
         />
       )}
 
